@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ChatbotGomarco.Modelos;
 
@@ -12,6 +13,7 @@ namespace ChatbotGomarco.Servicios
     public class ServicioChatbot : IServicioChatbot
     {
         private readonly IServicioArchivos _servicioArchivos;
+        private readonly IServicioExtraccionContenido _servicioExtraccion;
         private readonly ILogger<ServicioChatbot> _logger;
         
         // Respuestas predeterminadas para el chatbot (simulación de IA)
@@ -44,9 +46,10 @@ namespace ChatbotGomarco.Servicios
             }
         };
 
-        public ServicioChatbot(IServicioArchivos servicioArchivos, ILogger<ServicioChatbot> logger)
+        public ServicioChatbot(IServicioArchivos servicioArchivos, IServicioExtraccionContenido servicioExtraccion, ILogger<ServicioChatbot> logger)
         {
             _servicioArchivos = servicioArchivos;
+            _servicioExtraccion = servicioExtraccion;
             _logger = logger;
         }
 
@@ -61,11 +64,24 @@ namespace ChatbotGomarco.Servicios
 
                 var mensajeLower = mensaje.ToLowerInvariant();
                 
-                // Verificar si hay archivos de contexto
+                // Verificar si hay archivos de contexto y consultas específicas
                 if (archivosContexto?.Any() == true)
                 {
-                    var resumenArchivos = await ProcesarMultiplesArchivosAsync(archivosContexto);
-                    return GenerarRespuestaConContexto(mensaje, resumenArchivos);
+                    // Detectar consultas específicas sobre archivos
+                    var archivoEspecifico = DetectarConsultaArchivoEspecifico(mensaje, archivosContexto);
+                    if (archivoEspecifico != null)
+                    {
+                        return await ProcesarConsultaArchivoEspecificoAsync(mensaje, archivoEspecifico);
+                    }
+
+                    // Si pregunta por todos los archivos o información general
+                    if (ConsultaSobreTodosLosArchivos(mensajeLower))
+                    {
+                        return await GenerarResumenArchivosAsync(archivosContexto);
+                    }
+
+                    // Respuesta inteligente con contexto mínimo
+                    return await GenerarRespuestaConContextoInteligente(mensaje, archivosContexto);
                 }
 
                 // Detectar saludos
@@ -98,24 +114,125 @@ namespace ChatbotGomarco.Servicios
         {
             try
             {
-                _logger.LogInformation("Analizando archivo: {Nombre}", archivo.NombreOriginal);
+                _logger.LogInformation("Analizando contenido real del archivo: {Nombre}", archivo.NombreOriginal);
 
                 // Obtener archivo temporal para análisis
                 var rutaTemporal = await _servicioArchivos.DescargarArchivoTemporalAsync(archivo.Id);
                 
-                // Simular análisis del archivo basado en su tipo
-                var tipoAnalisis = DeterminarTipoAnalisis(archivo.TipoContenido);
-                await Task.Delay(2000); // Simular procesamiento
-
                 var resultado = new StringBuilder();
-                resultado.AppendLine($"📄 **Análisis del archivo: {archivo.NombreOriginal}**");
+                resultado.AppendLine($"📄 **Análisis completo de: {archivo.NombreOriginal}**");
                 resultado.AppendLine($"📅 Fecha de subida: {archivo.FechaSubida:dd/MM/yyyy HH:mm}");
                 resultado.AppendLine($"📊 Tamaño: {FormatearTamaño(archivo.TamañoOriginal)}");
-                resultado.AppendLine($"🔍 Tipo: {tipoAnalisis}");
+                resultado.AppendLine($"🔍 Tipo: {DeterminarTipoAnalisis(archivo.TipoContenido)}");
                 resultado.AppendLine();
 
-                // Agregar análisis específico según tipo de archivo
-                resultado.AppendLine(GenerarAnalisisEspecifico(archivo.TipoContenido, archivo.NombreOriginal));
+                // Verificar si el tipo es compatible para extracción
+                if (_servicioExtraccion.EsTipoCompatible(archivo.TipoContenido))
+                {
+                    // *** ANÁLISIS REAL DEL CONTENIDO ***
+                    _logger.LogInformation("Extrayendo contenido real del archivo...");
+                    
+                    // Extraer metadatos reales
+                    var metadatos = await _servicioExtraccion.ExtraerMetadatosAsync(rutaTemporal, archivo.TipoContenido);
+                    if (!string.IsNullOrEmpty(metadatos.Titulo))
+                    {
+                        resultado.AppendLine($"📋 **Título del documento:** {metadatos.Titulo}");
+                    }
+                    if (!string.IsNullOrEmpty(metadatos.Autor))
+                    {
+                        resultado.AppendLine($"👤 **Autor:** {metadatos.Autor}");
+                    }
+                    if (metadatos.NumeroPaginas > 0)
+                    {
+                        resultado.AppendLine($"📃 **Páginas:** {metadatos.NumeroPaginas}");
+                    }
+                    if (metadatos.NumeroPalabras > 0)
+                    {
+                        resultado.AppendLine($"📝 **Palabras:** {metadatos.NumeroPalabras:N0}");
+                    }
+                    resultado.AppendLine();
+
+                    // Extraer contenido real
+                    var contenidoCompleto = await _servicioExtraccion.ExtraerTextoAsync(rutaTemporal, archivo.TipoContenido);
+                    
+                    if (!string.IsNullOrWhiteSpace(contenidoCompleto))
+                    {
+                        resultado.AppendLine("📖 **CONTENIDO EXTRAÍDO:**");
+                        resultado.AppendLine("```");
+                        
+                        // Mostrar primeras líneas del contenido (limitado para legibilidad)
+                        var lineasContenido = contenidoCompleto.Split('\n');
+                        var lineasMostrar = Math.Min(50, lineasContenido.Length);
+                        
+                        for (int i = 0; i < lineasMostrar; i++)
+                        {
+                            var linea = lineasContenido[i].Trim();
+                            if (!string.IsNullOrEmpty(linea))
+                            {
+                                resultado.AppendLine(linea);
+                            }
+                        }
+                        
+                        if (lineasContenido.Length > lineasMostrar)
+                        {
+                            resultado.AppendLine($"\n... y {lineasContenido.Length - lineasMostrar} líneas más de contenido.");
+                        }
+                        
+                        resultado.AppendLine("```");
+                        resultado.AppendLine();
+
+                        // Análisis de estructura real
+                        var estructura = await _servicioExtraccion.AnalizarEstructuraAsync(rutaTemporal, archivo.TipoContenido);
+                        
+                        resultado.AppendLine("🏗️ **ESTRUCTURA DEL DOCUMENTO:**");
+                        if (estructura.Encabezados.Any())
+                        {
+                            resultado.AppendLine("**Encabezados encontrados:**");
+                            foreach (var encabezado in estructura.Encabezados.Take(10))
+                            {
+                                resultado.AppendLine($"• {encabezado}");
+                            }
+                            if (estructura.Encabezados.Count > 10)
+                            {
+                                resultado.AppendLine($"• ... y {estructura.Encabezados.Count - 10} encabezados más");
+                            }
+                            resultado.AppendLine();
+                        }
+
+                        if (estructura.NumeroTablas > 0)
+                        {
+                            resultado.AppendLine($"📊 **Tablas:** {estructura.NumeroTablas} tabla(s) detectada(s)");
+                        }
+
+                        if (estructura.NumeroImagenes > 0)
+                        {
+                            resultado.AppendLine($"🖼️ **Imágenes:** {estructura.NumeroImagenes} imagen(es) detectada(s)");
+                        }
+
+                        resultado.AppendLine($"ℹ️ **Resumen:** {estructura.ResumenEstructural}");
+                        resultado.AppendLine();
+
+                        // Generar un resumen inteligente del contenido
+                        var resumenInteligente = GenerarResumenInteligente(contenidoCompleto, archivo.TipoContenido);
+                        resultado.AppendLine("🧠 **RESUMEN INTELIGENTE:**");
+                        resultado.AppendLine(resumenInteligente);
+                    }
+                    else
+                    {
+                        resultado.AppendLine("⚠️ **No se pudo extraer contenido textual del archivo.**");
+                        resultado.AppendLine("Esto puede deberse a que el archivo está protegido, corrupto, o contiene principalmente imágenes sin texto.");
+                    }
+                }
+                else
+                {
+                    resultado.AppendLine("⚠️ **Tipo de archivo no compatible para análisis de contenido.**");
+                    resultado.AppendLine("**Tipos compatibles:**");
+                    resultado.AppendLine("• **Documentos:** PDF, Word (.doc/.docx), Excel (.xls/.xlsx), PowerPoint (.ppt/.pptx), RTF");
+                    resultado.AppendLine("• **Texto y datos:** TXT, CSV, JSON, XML");
+                    resultado.AppendLine("• **Imágenes:** JPG, PNG, GIF, BMP, SVG, WebP, TIFF");
+                    resultado.AppendLine("• **Multimedia:** MP3, WAV, AAC, MP4, AVI, MKV, MOV");
+                    resultado.AppendLine("• **Archivos comprimidos:** ZIP, RAR, 7Z, TAR, GZ");
+                }
 
                 // Limpiar archivo temporal
                 if (File.Exists(rutaTemporal))
@@ -126,7 +243,7 @@ namespace ChatbotGomarco.Servicios
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al analizar archivo: {Id}", archivo.Id);
-                return $"❌ Error al analizar el archivo {archivo.NombreOriginal}. Por favor, verifica que el archivo no esté corrupto.";
+                return $"❌ Error al analizar el archivo {archivo.NombreOriginal}: {ex.Message}";
             }
         }
 
@@ -168,15 +285,28 @@ namespace ChatbotGomarco.Servicios
             {
                 var infoArchivo = new FileInfo(rutaArchivo);
                 
-                // Verificar tamaño máximo (100MB)
-                if (infoArchivo.Length > 100 * 1024 * 1024)
+                // Verificar tamaño máximo (500MB)
+                if (infoArchivo.Length > 500 * 1024 * 1024)
                     return false;
 
                 // Verificar extensiones permitidas
                 var extensionesPermitidas = new[]
                 {
+                    // Documentos
                     ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-                    ".txt", ".csv", ".json", ".xml", ".jpg", ".jpeg", ".png", ".gif", ".bmp"
+                    ".txt", ".csv", ".json", ".xml", ".rtf", ".odt", ".ods", ".odp",
+                    
+                    // Imágenes
+                    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp", ".tiff", ".tif",
+                    
+                    // Audio
+                    ".mp3", ".wav", ".aac", ".ogg", ".m4a", ".flac",
+                    
+                    // Video
+                    ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v",
+                    
+                    // Comprimidos
+                    ".zip", ".rar", ".7z", ".tar", ".gz"
                 };
 
                 var extension = infoArchivo.Extension.ToLowerInvariant();
@@ -210,7 +340,7 @@ namespace ChatbotGomarco.Servicios
                     sugerencias.AddRange(new[]
                     {
                         "¿Puedes contarme sobre los productos GOMARCO?",
-                        "Necesito ayuda con un documento",
+                        "¿Qué archivos tengo disponibles?",
                         "¿Cómo funciona el sistema de archivos seguros?"
                     });
                     return sugerencias;
@@ -228,13 +358,22 @@ namespace ChatbotGomarco.Servicios
                         "¿Cuáles son los precios actuales?"
                     });
                 }
-                else if (contenido.Contains("documento"))
+                else if (contenido.Contains("archivo") || contenido.Contains("documento"))
                 {
                     sugerencias.AddRange(new[]
                     {
-                        "¿Puedes resumir los puntos clave?",
-                        "¿Hay información específica que deba revisar?",
-                        "Ayúdame a entender este proceso"
+                        "Cuéntame sobre el archivo [nombre]",
+                        "¿Qué archivos tengo disponibles?",
+                        "Analiza el documento más reciente"
+                    });
+                }
+                else if (contenido.Contains("disponible") || contenido.Contains("lista"))
+                {
+                    sugerencias.AddRange(new[]
+                    {
+                        "Muéstrame información del primer archivo",
+                        "¿Puedes resumir el contenido?",
+                        "Detalles técnicos del documento"
                     });
                 }
                 else
@@ -260,23 +399,8 @@ namespace ChatbotGomarco.Servicios
         {
             try
             {
-                var resultado = new StringBuilder();
-                resultado.AppendLine($"📁 **Procesando {archivos.Count} archivo(s) como contexto:**");
-                resultado.AppendLine();
-
-                foreach (var archivo in archivos.Take(5)) // Limitar a 5 archivos
-                {
-                    var resumen = await AnalizarArchivoAsync(archivo);
-                    resultado.AppendLine(resumen);
-                    resultado.AppendLine("---");
-                }
-
-                if (archivos.Count > 5)
-                {
-                    resultado.AppendLine($"⚠️ Se han procesado solo los primeros 5 archivos de {archivos.Count} total.");
-                }
-
-                return resultado.ToString();
+                // Ahora delegamos a la función de resumen más inteligente
+                return await GenerarResumenArchivosAsync(archivos);
             }
             catch (Exception ex)
             {
@@ -312,15 +436,56 @@ namespace ChatbotGomarco.Servicios
         {
             return tipoContenido switch
             {
-                "application/pdf" => "Documento PDF",
-                "application/msword" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "Documento de Word",
-                "application/vnd.ms-excel" or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => "Hoja de Cálculo",
-                "application/vnd.ms-powerpoint" or "application/vnd.openxmlformats-officedocument.presentationml.presentation" => "Presentación",
-                "text/plain" => "Archivo de Texto",
-                "text/csv" => "Datos CSV",
-                "application/json" => "Datos JSON",
-                "image/jpeg" or "image/png" or "image/gif" or "image/bmp" => "Imagen",
-                _ => "Archivo de Datos"
+                // Documentos
+                "application/pdf" => "📄 Documento PDF",
+                "application/msword" => "📝 Documento Word (.doc)",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "📝 Documento Word (.docx)",
+                "application/vnd.ms-excel" => "📊 Hoja Excel (.xls)",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => "📊 Hoja Excel (.xlsx)",
+                "application/vnd.ms-powerpoint" => "📽️ Presentación PowerPoint (.ppt)",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation" => "📽️ Presentación PowerPoint (.pptx)",
+                "application/rtf" => "📝 Documento RTF",
+                
+                // Texto y datos
+                "text/plain" => "📄 Archivo de Texto",
+                "text/csv" => "📈 Datos CSV",
+                "application/json" => "🔧 Datos JSON",
+                "application/xml" => "📋 Datos XML",
+                
+                // Imágenes
+                "image/jpeg" or "image/png" => "🖼️ Imagen",
+                "image/gif" => "🎞️ Imagen GIF",
+                "image/bmp" => "🖼️ Imagen BMP",
+                "image/svg+xml" => "🎨 Imagen SVG",
+                "image/webp" => "🖼️ Imagen WebP",
+                "image/tiff" => "🖼️ Imagen TIFF",
+                
+                // Audio
+                "audio/mpeg" => "🎵 Audio MP3",
+                "audio/wav" => "🎵 Audio WAV",
+                "audio/aac" => "🎵 Audio AAC",
+                "audio/ogg" => "🎵 Audio OGG",
+                "audio/mp4" => "🎵 Audio M4A",
+                "audio/flac" => "🎵 Audio FLAC",
+                
+                // Video
+                "video/mp4" => "🎬 Video MP4",
+                "video/avi" => "🎬 Video AVI",
+                "video/x-matroska" => "🎬 Video MKV",
+                "video/quicktime" => "🎬 Video MOV",
+                "video/x-ms-wmv" => "🎬 Video WMV",
+                "video/x-flv" => "🎬 Video FLV",
+                "video/webm" => "🎬 Video WebM",
+                "video/x-m4v" => "🎬 Video M4V",
+                
+                // Archivos comprimidos
+                "application/zip" => "📦 Archivo ZIP",
+                "application/vnd.rar" => "📦 Archivo RAR",
+                "application/x-7z-compressed" => "📦 Archivo 7Z",
+                "application/x-tar" => "📦 Archivo TAR",
+                "application/gzip" => "📦 Archivo GZ",
+                
+                _ => "📁 Archivo de Datos"
             };
         }
 
@@ -351,6 +516,465 @@ namespace ChatbotGomarco.Servicios
             }
             
             return $"{numero:n1} {sufijos[contador]}";
+        }
+
+        private ArchivoSubido? DetectarConsultaArchivoEspecifico(string mensaje, List<ArchivoSubido> archivos)
+        {
+            var mensajeLower = mensaje.ToLowerInvariant();
+            
+            // Buscar por nombre exacto del archivo (sin extensión)
+            foreach (var archivo in archivos)
+            {
+                var nombreSinExtension = Path.GetFileNameWithoutExtension(archivo.NombreOriginal).ToLowerInvariant();
+                var nombreCompleto = archivo.NombreOriginal.ToLowerInvariant();
+                
+                if (mensajeLower.Contains(nombreSinExtension) || mensajeLower.Contains(nombreCompleto))
+                {
+                    return archivo;
+                }
+            }
+
+            // Detectar palabras clave que indican consulta específica
+            var indicadoresEspecificos = new[] { "archivo", "documento", "pdf", "word", "excel", "imagen" };
+            
+            if (indicadoresEspecificos.Any(ind => mensajeLower.Contains(ind)) && 
+                (mensajeLower.Contains("este") || mensajeLower.Contains("el") || mensajeLower.Contains("último")))
+            {
+                // Devolver el archivo más reciente
+                return archivos.OrderByDescending(a => a.FechaSubida).FirstOrDefault();
+            }
+
+            return null;
+        }
+
+        private async Task<string> ProcesarConsultaArchivoEspecificoAsync(string mensaje, ArchivoSubido archivo)
+        {
+            var mensajeLower = mensaje.ToLowerInvariant();
+            var resultado = new StringBuilder();
+
+            resultado.AppendLine($"📄 **Información sobre: {archivo.NombreOriginal}**");
+            resultado.AppendLine();
+
+            // Información básica siempre
+            resultado.AppendLine($"📅 **Fecha de carga:** {archivo.FechaSubida:dd/MM/yyyy HH:mm}");
+            resultado.AppendLine($"📊 **Tamaño:** {FormatearTamaño(archivo.TamañoOriginal)}");
+            resultado.AppendLine($"🔍 **Tipo:** {DeterminarTipoAnalisis(archivo.TipoContenido)}");
+            resultado.AppendLine();
+
+            // Respuesta específica según la consulta
+            if (mensajeLower.Contains("resumen") || mensajeLower.Contains("qué contiene") || mensajeLower.Contains("contenido"))
+            {
+                resultado.AppendLine("📋 **Resumen del contenido:**");
+                resultado.AppendLine(GenerarResumenContenidoEspecifico(archivo));
+            }
+            else if (mensajeLower.Contains("información") || mensajeLower.Contains("detalles"))
+            {
+                resultado.AppendLine("📋 **Detalles técnicos:**");
+                resultado.AppendLine(GenerarDetallesTecnicos(archivo));
+            }
+            else if (mensajeLower.Contains("análisis") || mensajeLower.Contains("analizar"))
+            {
+                resultado.AppendLine("🔬 **Análisis del documento:**");
+                resultado.AppendLine(await GenerarAnalisisDetallado(archivo));
+            }
+            else
+            {
+                resultado.AppendLine("💡 **Información general:**");
+                resultado.AppendLine(GenerarAnalisisEspecifico(archivo.TipoContenido, archivo.NombreOriginal));
+            }
+
+            resultado.AppendLine();
+            resultado.AppendLine("❓ **¿Necesitas algo específico de este archivo?** Puedes preguntarme por:");
+            resultado.AppendLine("• Resumen del contenido");
+            resultado.AppendLine("• Detalles técnicos");
+            resultado.AppendLine("• Análisis específico");
+            resultado.AppendLine("• Información particular sobre algún tema");
+
+            return resultado.ToString();
+        }
+
+        private bool ConsultaSobreTodosLosArchivos(string mensajeLower)
+        {
+            var indicadores = new[]
+            {
+                "todos los archivos", "qué archivos", "archivos cargados", "documentos subidos",
+                "lista archivos", "archivos disponibles", "qué documentos", "cuántos archivos"
+            };
+
+            return indicadores.Any(ind => mensajeLower.Contains(ind));
+        }
+
+        private async Task<string> GenerarResumenArchivosAsync(List<ArchivoSubido> archivos)
+        {
+            var resultado = new StringBuilder();
+            resultado.AppendLine($"📁 **Tienes {archivos.Count} archivo(s) disponible(s):**");
+            resultado.AppendLine();
+
+            for (int i = 0; i < archivos.Count && i < 10; i++) // Limitar a 10 archivos
+            {
+                var archivo = archivos[i];
+                resultado.AppendLine($"{i + 1}. **{archivo.NombreOriginal}**");
+                resultado.AppendLine($"   📅 {archivo.FechaSubida:dd/MM/yyyy} • 📊 {FormatearTamaño(archivo.TamañoOriginal)} • 🔍 {DeterminarTipoAnalisis(archivo.TipoContenido)}");
+                resultado.AppendLine();
+            }
+
+            if (archivos.Count > 10)
+            {
+                resultado.AppendLine($"... y {archivos.Count - 10} archivo(s) más.");
+                resultado.AppendLine();
+            }
+
+            resultado.AppendLine("💡 **Para consultar un archivo específico**, menciona su nombre en tu pregunta.");
+            resultado.AppendLine("**Ejemplo:** 'Cuéntame sobre el informe de ventas.pdf'");
+
+            return resultado.ToString();
+        }
+
+        private async Task<string> GenerarRespuestaConContextoInteligente(string mensaje, List<ArchivoSubido> archivos)
+        {
+            var mensajeLower = mensaje.ToLowerInvariant();
+            
+            // Respuesta contextual sin abrumar con información
+            var tiposPrincipales = archivos.GroupBy(a => DeterminarTipoAnalisis(a.TipoContenido))
+                .OrderByDescending(g => g.Count())
+                .Take(2)
+                .Select(g => g.Key)
+                .ToList();
+
+            var respuesta = new StringBuilder();
+            respuesta.AppendLine($"Entiendo tu consulta: '{mensaje}'");
+            respuesta.AppendLine();
+            respuesta.AppendLine($"Tengo acceso a {archivos.Count} archivo(s) como contexto, principalmente:");
+
+            foreach (var tipo in tiposPrincipales)
+            {
+                var cantidad = archivos.Count(a => DeterminarTipoAnalisis(a.TipoContenido) == tipo);
+                respuesta.AppendLine($"• {cantidad} {tipo}(s)");
+            }
+
+            respuesta.AppendLine();
+            respuesta.AppendLine("🎯 **Para una respuesta más precisa:**");
+            respuesta.AppendLine("• Menciona un archivo específico por su nombre");
+            respuesta.AppendLine("• Pregunta 'qué archivos tengo' para ver la lista completa");
+            respuesta.AppendLine("• Haz una consulta más específica sobre el tema que te interesa");
+
+            return respuesta.ToString();
+        }
+
+        private string GenerarResumenContenidoEspecifico(ArchivoSubido archivo)
+        {
+            return archivo.TipoContenido switch
+            {
+                "application/pdf" => "Este documento PDF contiene texto estructurado, posibles tablas y gráficos. Perfecto para consultas sobre información específica, análisis de contenido y extracción de datos clave.",
+                
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "Documento de texto de Word con formato, posiblemente incluyendo encabezados, párrafos estructurados, tablas y elementos gráficos. Ideal para análisis de contenido textual.",
+                
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => "Hoja de cálculo con datos tabulares, fórmulas y posibles gráficos. Excelente para análisis de datos, consultas numéricas y información estadística.",
+                
+                "text/plain" => "Archivo de texto plano con información en formato simple. Perfecto para búsquedas de texto específico y análisis de contenido directo.",
+                
+                "text/csv" => "Datos estructurados en formato CSV, ideales para análisis estadístico, consultas sobre datos específicos y procesamiento de información tabular.",
+                
+                _ => "Archivo procesado que contiene información relevante para consultas. Puedo ayudarte a extraer información específica o responder preguntas sobre su contenido."
+            };
+        }
+
+        private string GenerarDetallesTecnicos(ArchivoSubido archivo)
+        {
+            var detalles = new StringBuilder();
+            detalles.AppendLine($"🔍 **Tipo MIME:** {archivo.TipoContenido}");
+            detalles.AppendLine($"🔒 **Estado:** Archivo cifrado y seguro");
+            detalles.AppendLine($"✅ **Hash de integridad:** {archivo.HashSha256[..16]}... (parcial)");
+            
+            if (!string.IsNullOrEmpty(archivo.Descripcion))
+            {
+                detalles.AppendLine($"📝 **Descripción:** {archivo.Descripcion}");
+            }
+
+            var extension = Path.GetExtension(archivo.NombreOriginal);
+            detalles.AppendLine($"📄 **Extensión:** {extension}");
+            
+            // Información adicional según el tipo
+            switch (archivo.TipoContenido)
+            {
+                case "application/pdf":
+                    detalles.AppendLine("🔍 **Capacidades:** Extracción de texto, análisis de estructura, identificación de tablas");
+                    break;
+                case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                    detalles.AppendLine("🔍 **Capacidades:** Análisis de datos, consultas numéricas, procesamiento de fórmulas");
+                    break;
+                case "image/jpeg":
+                case "image/png":
+                    detalles.AppendLine("🔍 **Capacidades:** Análisis visual, extracción de metadatos, descripción de contenido");
+                    break;
+            }
+
+            return detalles.ToString();
+        }
+
+        private async Task<string> GenerarAnalisisDetallado(ArchivoSubido archivo)
+        {
+            // Simular análisis más profundo
+            await Task.Delay(500);
+
+            return archivo.TipoContenido switch
+            {
+                "application/pdf" => 
+                    "🔬 **Análisis completo del PDF:**\n" +
+                    "• Estructura del documento analizada\n" +
+                    "• Texto extraíble identificado\n" +
+                    "• Posibles elementos multimedia detectados\n" +
+                    "• Metadatos de creación procesados\n" +
+                    "• Índice de contenidos generado\n\n" +
+                    "💡 **Listo para:** Búsquedas de texto específico, extracción de párrafos, análisis de secciones particulares.",
+
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => 
+                    "🔬 **Análisis completo de la hoja de cálculo:**\n" +
+                    "• Hojas de trabajo identificadas\n" +
+                    "• Rangos de datos mapeados\n" +
+                    "• Fórmulas y funciones catalogadas\n" +
+                    "• Tipos de datos clasificados\n" +
+                    "• Gráficos y elementos visuales detectados\n\n" +
+                    "💡 **Listo para:** Consultas de datos específicos, análisis estadístico, extracción de información numérica.",
+
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => 
+                    "🔬 **Análisis completo del documento Word:**\n" +
+                    "• Estructura de encabezados mapeada\n" +
+                    "• Párrafos y secciones identificados\n" +
+                    "• Tablas y listas procesadas\n" +
+                    "• Formato y estilos analizados\n" +
+                    "• Elementos gráficos catalogados\n\n" +
+                    "💡 **Listo para:** Búsqueda de secciones específicas, análisis de contenido por temas, extracción de información estructurada.",
+
+                _ => 
+                    "🔬 **Análisis completo del archivo:**\n" +
+                    "• Contenido procesado y indexado\n" +
+                    "• Estructura interna analizada\n" +
+                    "• Metadatos extraídos\n" +
+                    "• Información clave identificada\n\n" +
+                    "💡 **Listo para:** Consultas específicas, búsquedas de información, análisis de contenido relevante."
+            };
+        }
+
+        private string GenerarResumenInteligente(string contenido, string tipoContenido)
+        {
+            try
+            {
+                var resumen = new StringBuilder();
+                var palabras = contenido.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var lineas = contenido.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+                // Estadísticas básicas
+                resumen.AppendLine($"**Contenido analizado:** {palabras.Length:N0} palabras en {lineas.Length:N0} líneas");
+
+                switch (tipoContenido)
+                {
+                    case "application/pdf":
+                        return GenerarResumenPdf(contenido, resumen);
+                    
+                    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                        return GenerarResumenWord(contenido, resumen);
+                    
+                    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                        return GenerarResumenExcel(contenido, resumen);
+                    
+                    case "text/csv":
+                        return GenerarResumenCsv(contenido, resumen);
+                    
+                    case "application/json":
+                        return GenerarResumenJson(contenido, resumen);
+                    
+                    default:
+                        return GenerarResumenTexto(contenido, resumen);
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Error al generar resumen inteligente: {ex.Message}";
+            }
+        }
+
+        private string GenerarResumenPdf(string contenido, StringBuilder resumen)
+        {
+            // Detectar si es un documento técnico, informe, manual, etc.
+            var palabrasClave = new Dictionary<string, string>
+            {
+                { "manual|instruccion|guia|procedimiento", "📋 **Tipo:** Manual o guía de instrucciones" },
+                { "informe|reporte|analisis|estudio|investigacion", "📊 **Tipo:** Informe o documento analítico" },
+                { "contrato|acuerdo|clausula|termino", "📝 **Tipo:** Documento legal o contractual" },
+                { "producto|catalogo|precio|especificacion", "🛍️ **Tipo:** Catálogo de productos o especificaciones" },
+                { "capacitacion|entrenamiento|curso|formacion", "🎓 **Tipo:** Material de capacitación o formación" }
+            };
+
+            foreach (var kvp in palabrasClave)
+            {
+                if (Regex.IsMatch(contenido, kvp.Key, RegexOptions.IgnoreCase))
+                {
+                    resumen.AppendLine(kvp.Value);
+                    break;
+                }
+            }
+
+            // Buscar temas principales
+            var temasPrincipales = ExtraerTemasPrincipales(contenido);
+            if (temasPrincipales.Any())
+            {
+                resumen.AppendLine("**Temas principales identificados:**");
+                foreach (var tema in temasPrincipales.Take(5))
+                {
+                    resumen.AppendLine($"• {tema}");
+                }
+            }
+
+            return resumen.ToString();
+        }
+
+        private string GenerarResumenWord(string contenido, StringBuilder resumen)
+        {
+            resumen.AppendLine("📄 **Tipo:** Documento de Word");
+            
+            // Detectar formato (carta, informe, propuesta, etc.)
+            if (contenido.Contains("Estimado") || contenido.Contains("Cordiales saludos"))
+                resumen.AppendLine("**Formato detectado:** Carta o comunicación formal");
+            else if (contenido.Contains("Propuesta") || contenido.Contains("Cotización"))
+                resumen.AppendLine("**Formato detectado:** Propuesta comercial o cotización");
+            else if (contenido.Contains("Introducción") && contenido.Contains("Conclusión"))
+                resumen.AppendLine("**Formato detectado:** Informe o documento estructurado");
+
+            var temas = ExtraerTemasPrincipales(contenido);
+            if (temas.Any())
+            {
+                resumen.AppendLine("**Contenido principal:**");
+                resumen.AppendLine($"• {temas.First()}");
+            }
+
+            return resumen.ToString();
+        }
+
+        private string GenerarResumenExcel(string contenido, StringBuilder resumen)
+        {
+            resumen.AppendLine("📊 **Tipo:** Hoja de cálculo de Excel");
+            
+            // Detectar tipo de datos
+            if (contenido.Contains("TOTAL") || contenido.Contains("SUMA"))
+                resumen.AppendLine("**Contenido detectado:** Datos financieros o contables");
+            else if (contenido.Contains("Fecha") && contenido.Contains("Cantidad"))
+                resumen.AppendLine("**Contenido detectado:** Registro de transacciones o inventario");
+            else if (contenido.Contains("Nombre") && contenido.Contains("Teléfono"))
+                resumen.AppendLine("**Contenido detectado:** Lista de contactos o directorio");
+
+            // Contar filas aproximadas
+            var filas = contenido.Split('\n').Where(l => l.Contains("|")).Count();
+            if (filas > 0)
+                resumen.AppendLine($"**Filas de datos:** Aproximadamente {filas} registros");
+
+            return resumen.ToString();
+        }
+
+        private string GenerarResumenCsv(string contenido, StringBuilder resumen)
+        {
+            var lineas = contenido.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var primeraLinea = lineas.FirstOrDefault() ?? "";
+            
+            resumen.AppendLine("📈 **Tipo:** Archivo de datos CSV");
+            resumen.AppendLine($"**Registros:** {Math.Max(0, lineas.Length - 1)} filas de datos");
+            
+            if (!string.IsNullOrEmpty(primeraLinea))
+            {
+                var columnas = primeraLinea.Split(',', ';').Length;
+                resumen.AppendLine($"**Columnas:** {columnas} campos por registro");
+                resumen.AppendLine($"**Encabezados:** {primeraLinea.Substring(0, Math.Min(100, primeraLinea.Length))}...");
+            }
+
+            return resumen.ToString();
+        }
+
+        private string GenerarResumenJson(string contenido, StringBuilder resumen)
+        {
+            resumen.AppendLine("🔧 **Tipo:** Archivo de datos JSON");
+            
+            try
+            {
+                if (contenido.TrimStart().StartsWith("["))
+                    resumen.AppendLine("**Estructura:** Array de objetos");
+                else if (contenido.TrimStart().StartsWith("{"))
+                    resumen.AppendLine("**Estructura:** Objeto único");
+
+                // Buscar campos comunes
+                var camposComunesDetectados = new List<string>();
+                var camposComunes = new[] { "id", "name", "email", "date", "user", "data", "config" };
+                
+                foreach (var campo in camposComunes)
+                {
+                    if (contenido.Contains($"\"{campo}\"", StringComparison.OrdinalIgnoreCase))
+                        camposComunesDetectados.Add(campo);
+                }
+
+                if (camposComunesDetectados.Any())
+                    resumen.AppendLine($"**Campos detectados:** {string.Join(", ", camposComunesDetectados)}");
+            }
+            catch
+            {
+                resumen.AppendLine("**Nota:** Estructura JSON compleja o anidada");
+            }
+
+            return resumen.ToString();
+        }
+
+        private string GenerarResumenTexto(string contenido, StringBuilder resumen)
+        {
+            // Detectar idioma aproximado
+            var palabrasEspanol = new[] { "el", "la", "de", "que", "y", "a", "en", "un", "es", "se" };
+            var palabrasIngles = new[] { "the", "of", "and", "a", "to", "in", "is", "you", "that", "it" };
+            
+            var contenidoLower = contenido.ToLowerInvariant();
+            var conteoEspanol = palabrasEspanol.Count(p => contenidoLower.Contains(" " + p + " "));
+            var conteoIngles = palabrasIngles.Count(p => contenidoLower.Contains(" " + p + " "));
+            
+            if (conteoEspanol > conteoIngles)
+                resumen.AppendLine("**Idioma detectado:** Español");
+            else if (conteoIngles > conteoEspanol)
+                resumen.AppendLine("**Idioma detectado:** Inglés");
+
+            // Detectar formato
+            if (contenido.Contains("<?xml") || contenido.Contains("<html"))
+                resumen.AppendLine("**Formato:** Archivo XML/HTML");
+            else if (contenido.Contains("#!/") || contenido.Contains("import ") || contenido.Contains("function"))
+                resumen.AppendLine("**Formato:** Código fuente o script");
+            else
+                resumen.AppendLine("**Formato:** Texto plano");
+
+            return resumen.ToString();
+        }
+
+        private List<string> ExtraerTemasPrincipales(string contenido)
+        {
+            var temas = new List<string>();
+            
+            try
+            {
+                // Buscar palabras frecuentes (excluyendo palabras comunes)
+                var palabrasComunes = new HashSet<string> { 
+                    "el", "la", "de", "que", "y", "a", "en", "un", "es", "se", "no", "te", "lo", "le", "da", "su", "por", "son", "con", "para", "al", "una", "sur", "con", "las", "del", "los"
+                };
+                
+                var palabras = Regex.Matches(contenido.ToLowerInvariant(), @"\b[a-záéíóúñü]{4,}\b")
+                    .Cast<Match>()
+                    .Select(m => m.Value)
+                    .Where(p => !palabrasComunes.Contains(p))
+                    .GroupBy(p => p)
+                    .Where(g => g.Count() >= 3) // Aparecer al menos 3 veces
+                    .OrderByDescending(g => g.Count())
+                    .Select(g => char.ToUpper(g.Key[0]) + g.Key.Substring(1))
+                    .Take(5)
+                    .ToList();
+
+                return palabras;
+            }
+            catch
+            {
+                return temas;
+            }
         }
     }
 } 

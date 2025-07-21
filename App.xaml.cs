@@ -33,6 +33,7 @@ namespace ChatbotGomarco
             servicios.AddScoped<IServicioArchivos, ServicioArchivos>();
             servicios.AddScoped<IServicioHistorialChats, ServicioHistorialChats>();
             servicios.AddScoped<IServicioChatbot, ServicioChatbot>();
+            servicios.AddScoped<IServicioExtraccionContenido, ServicioExtraccionContenido>();
 
             // ViewModels
             servicios.AddTransient<ViewModeloVentanaPrincipal>();

@@ -231,6 +231,7 @@ namespace ChatbotGomarco.Servicios
             var extension = Path.GetExtension(nombreArchivo).ToLowerInvariant();
             return extension switch
             {
+                // Documentos
                 ".pdf" => "application/pdf",
                 ".doc" => "application/msword",
                 ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -238,14 +239,51 @@ namespace ChatbotGomarco.Servicios
                 ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 ".ppt" => "application/vnd.ms-powerpoint",
                 ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                ".rtf" => "application/rtf",
+                ".odt" => "application/vnd.oasis.opendocument.text",
+                ".ods" => "application/vnd.oasis.opendocument.spreadsheet",
+                ".odp" => "application/vnd.oasis.opendocument.presentation",
+                
+                // Texto
                 ".txt" => "text/plain",
                 ".csv" => "text/csv",
+                ".json" => "application/json",
+                ".xml" => "application/xml",
+                
+                // Imágenes
                 ".jpg" or ".jpeg" => "image/jpeg",
                 ".png" => "image/png",
                 ".gif" => "image/gif",
                 ".bmp" => "image/bmp",
-                ".json" => "application/json",
-                ".xml" => "application/xml",
+                ".svg" => "image/svg+xml",
+                ".webp" => "image/webp",
+                ".tiff" or ".tif" => "image/tiff",
+                
+                // Audio
+                ".mp3" => "audio/mpeg",
+                ".wav" => "audio/wav",
+                ".aac" => "audio/aac",
+                ".ogg" => "audio/ogg",
+                ".m4a" => "audio/mp4",
+                ".flac" => "audio/flac",
+                
+                // Video
+                ".mp4" => "video/mp4",
+                ".avi" => "video/avi",
+                ".mkv" => "video/x-matroska",
+                ".mov" => "video/quicktime",
+                ".wmv" => "video/x-ms-wmv",
+                ".flv" => "video/x-flv",
+                ".webm" => "video/webm",
+                ".m4v" => "video/x-m4v",
+                
+                // Comprimidos
+                ".zip" => "application/zip",
+                ".rar" => "application/vnd.rar",
+                ".7z" => "application/x-7z-compressed",
+                ".tar" => "application/x-tar",
+                ".gz" => "application/gzip",
+                
                 _ => "application/octet-stream"
             };
         }
