@@ -504,11 +504,11 @@
                                FontSize="11"
                                Foreground="{StaticResource ColorTextoSecundarioGomarco}"
                                Margin="0,0,0,4"/>
-                    <TextBlock Text="📎 Formatos: PDF, Word, Excel, Imágenes"
+                    <TextBlock Text="📎 Formatos: PDF, Word, Excel, y más"
                                FontSize="11"
                                Foreground="{StaticResource ColorTextoSecundarioGomarco}"
                                Margin="0,0,0,4"/>
-                    <TextBlock Text="⚡ Máximo 100MB por archivo"
+                                                                <TextBlock Text="⚡ Máximo 1GB por archivo"
                                FontSize="11"
                                Foreground="{StaticResource ColorTextoSecundarioGomarco}"/>
                 </StackPanel>

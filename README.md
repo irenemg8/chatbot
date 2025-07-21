@@ -47,7 +47,7 @@ El **Chatbot GOMARCO** es un asistente de inteligencia artificial corporativo di
 ### 📁 Gestión de Archivos
 - **Carga Múltiple**: Soporte para múltiples archivos simultáneamente
 - **Formatos Compatibles**: PDF, Word, Excel, PowerPoint, imágenes, texto
-- **Límite de Seguridad**: Máximo 100MB por archivo
+- **Límite de Seguridad**: Máximo 1GB por archivo
 - **Eliminación Segura**: Borrado completo de archivos cifrados
 
 ### 💬 Chatbot Inteligente
@@ -597,7 +597,7 @@ Archivos adjuntos:
 **A**: Sí, pero cada instalación es independiente. Los archivos cifrados no son compatibles entre equipos.
 
 #### Q: ¿Hay límite en el número de archivos?
-**A**: No hay límite en cantidad, pero cada archivo no puede exceder 100MB.
+**A**: No hay límite en cantidad, pero cada archivo no puede exceder 1GB.
 
 #### Q: ¿Cómo actualizo a una nueva versión?
 **A**: Ejecute el nuevo instalador. Mantendrá datos existentes.

@@ -179,7 +179,7 @@ namespace ChatbotGomarco.ViewModelos
             var esSeguro = await _servicioChatbot.ValidarSeguridadArchivoAsync(rutaArchivo);
             if (!esSeguro)
             {
-                MessageBox.Show($"El archivo {Path.GetFileName(rutaArchivo)} no es compatible o excede el tamaño máximo permitido (100MB).", 
+                MessageBox.Show($"El archivo {Path.GetFileName(rutaArchivo)} no es compatible o excede el tamaño máximo permitido (1GB).", 
                     "Archivo no válido", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

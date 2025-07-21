@@ -285,8 +285,8 @@ namespace ChatbotGomarco.Servicios
             {
                 var infoArchivo = new FileInfo(rutaArchivo);
                 
-                // Verificar tamaño máximo (500MB)
-                if (infoArchivo.Length > 500 * 1024 * 1024)
+                // Verificar tamaño máximo (1GB)
+                if (infoArchivo.Length > 1024 * 1024 * 1024)
                     return false;
 
                 // Verificar extensiones permitidas
