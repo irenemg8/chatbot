@@ -9,7 +9,7 @@ namespace ChatbotGomarco
 {
     public partial class App : Application
     {
-        private ServiceProvider? _proveeedorServicios;
+        private ServiceProvider? _proveedorServicios;
 
         protected override void OnStartup(StartupEventArgs argumentosInicio)
         {
@@ -37,24 +37,24 @@ namespace ChatbotGomarco
             // ViewModels
             servicios.AddTransient<ViewModeloVentanaPrincipal>();
 
-            _proveeedorServicios = servicios.BuildServiceProvider();
+            _proveedorServicios = servicios.BuildServiceProvider();
         }
 
         private void InicializarBaseDatos()
         {
-            using var alcance = _proveeedorServicios!.CreateScope();
+            using var alcance = _proveedorServicios!.CreateScope();
             var contexto = alcance.ServiceProvider.GetRequiredService<ContextoBaseDatos>();
             contexto.InicializarBaseDatos();
         }
 
         public T ObtenerServicio<T>() where T : class
         {
-            return _proveeedorServicios!.GetRequiredService<T>();
+            return _proveedorServicios!.GetRequiredService<T>();
         }
 
         protected override void OnExit(ExitEventArgs argumentosSalida)
         {
-            _proveeedorServicios?.Dispose();
+            _proveedorServicios?.Dispose();
             base.OnExit(argumentosSalida);
         }
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using ChatbotGomarco.ViewModelos;
 
@@ -9,9 +10,30 @@ namespace ChatbotGomarco.Vistas
         {
             InitializeComponent();
             
-            // Obtener el ViewModel desde el contenedor de servicios
-            var app = (App)Application.Current;
-            DataContext = app.ObtenerServicio<ViewModeloVentanaPrincipal>();
+            // Versión temporal simplificada - manejo de errores mejorado
+            try 
+            {
+                var app = (App)Application.Current;
+                if (app != null)
+                {
+                    DataContext = app.ObtenerServicio<ViewModeloVentanaPrincipal>();
+                }
+                else
+                {
+                    MostrarErrorInicializacion("La aplicación no se inicializó correctamente.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MostrarErrorInicializacion($"Error al cargar servicios: {ex.Message}");
+            }
+        }
+        
+        private void MostrarErrorInicializacion(string mensaje)
+        {
+            MessageBox.Show($"Error de inicialización:\n{mensaje}\n\nLa aplicación se cerrará.", 
+                "Error Crítico", MessageBoxButton.OK, MessageBoxImage.Error);
+            Close();
         }
 
         private void ScrollViewerMensajes_SizeChanged(object sender, SizeChangedEventArgs e)

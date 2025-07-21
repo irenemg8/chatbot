@@ -9,10 +9,6 @@
         WindowStartupLocation="CenterScreen"
         Icon="/Resources/gomarco-icon.ico"
         Background="{StaticResource ColorFondoGomarco}">
-    
-    <Window.DataContext>
-        <viewmodelos:ViewModeloVentanaPrincipal/>
-    </Window.DataContext>
 
     <Grid>
         <Grid.ColumnDefinitions>
