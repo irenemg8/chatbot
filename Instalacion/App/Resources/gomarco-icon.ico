@@ -1,0 +1,22 @@
+# PLACEHOLDER: Icono de GOMARCO
+
+Este archivo debería ser reemplazado por el icono oficial de GOMARCO en formato .ico
+
+Especificaciones recomendadas:
+- Formato: ICO (Windows Icon)
+- Tamaños: 16x16, 32x32, 48x48, 64x64, 128x128, 256x256 píxeles
+- Profundidad: 32 bits con transparencia
+- Colores: Paleta corporativa GOMARCO (grises, azules)
+
+Para generar el icono:
+1. Crear diseño en base al logo/marca GOMARCO
+2. Incluir elementos relacionados con colchones/descanso
+3. Mantener simplicidad para visualización en tamaños pequeños
+4. Usar herramientas como GIMP, Photoshop o convertidores online
+5. Guardar como "gomarco-icon.ico"
+
+Elementos sugeridos:
+- Logo GOMARCO simplificado
+- Icono de cama/colchón estilizado
+- Colores corporativos #6B7280, #3B82F6
+- Fondo transparente o sólido 
