@@ -230,7 +230,7 @@ public byte[] GenerarClaveCifrado()
 {
     var nombreMaquina = Environment.MachineName;     // DESKTOP-ABC123
     var nombreUsuario = Environment.UserName;       // irene
-    var datosUnicos = $"GOMARCO-{nombreMaquina}-{nombreUsuario}-CHATBOT-2024";
+    var datosUnicos = $"GOMARCO-{nombreMaquina}-{nombreUsuario}-CHATBOT-2025";
     
     using var sha256 = SHA256.Create();
     return sha256.ComputeHash(Encoding.UTF8.GetBytes(datosUnicos));
@@ -1087,7 +1087,7 @@ Write-Host "`n=== FIN DIAGNÓSTICO ===" -ForegroundColor Green
 ### Información de la Versión Actual
 
 - **Versión:** 2.0.0 (con análisis expandido de archivos)
-- **Fecha compilación:** Diciembre 2024
+- **Fecha compilación:** Julio 2025
 - **Framework:** .NET 8.0
 - **Compatibilidad:** Windows 10 1909+ / Windows 11
 

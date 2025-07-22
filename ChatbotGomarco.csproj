@@ -11,7 +11,7 @@
     <AssemblyProduct>Chatbot GOMARCO</AssemblyProduct>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <Copyright>Copyright © GOMARCO 2024</Copyright>
+    <Copyright>Copyright © GOMARCO 2025</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,6 +31,11 @@
     <!-- Librerías para análisis multimedia y otros formatos -->
     <PackageReference Include="MetadataExtractor" Version="2.8.1" />
     <PackageReference Include="SharpCompress" Version="0.34.2" />
+    
+    <!-- Librerías para OCR y análisis avanzado de imágenes -->
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
   </ItemGroup>
 
   <ItemGroup>

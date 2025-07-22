@@ -42,7 +42,7 @@ namespace ChatbotGomarco.ViewModelos
         private bool _mostrarPanelHistorial = true;
 
         [ObservableProperty]
-        private string _mensajeBienvenida = "¡Bienvenido al asistente de IA de GOMARCO! 🛏️\n\nSoy tu asistente virtual corporativo, especializado en:\n• Análisis de documentos confidenciales\n• Información sobre productos GOMARCO\n• Soporte con procesos empresariales\n• Gestión segura de archivos\n\n¿En qué puedo ayudarte hoy?";
+        private string _mensajeBienvenida = "¡Bienvenido al asistente de IA de GOMARCO! 🛏️\n\nSoy tu asistente virtual corporativo, especializado en:\n• Análisis de documentos confidenciales\n• Soporte con procesos empresariales\n• Gestión segura de archivos\n\n¿En qué puedo ayudarte hoy?";
 
         public ObservableCollection<MensajeChat> MensajesChat { get; } = new();
         public ObservableCollection<SesionChat> HistorialSesiones { get; } = new();

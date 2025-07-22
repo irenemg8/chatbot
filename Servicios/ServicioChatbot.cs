@@ -19,9 +19,9 @@ namespace ChatbotGomarco.Servicios
         // Respuestas predeterminadas para el chatbot (simulación de IA)
         private readonly List<string> _respuestasSaludo = new()
         {
-            "¡Hola! Soy el asistente de IA de GOMARCO. Estoy aquí para ayudarte con cualquier consulta relacionada con nuestros productos, procesos o documentos. ¿En qué puedo asistirte hoy?",
-            "¡Buenos días! Bienvenido al chatbot corporativo de GOMARCO. Puedo ayudarte con consultas sobre colchones, documentos corporativos, o cualquier información que necesites. ¿Cómo puedo ayudarte?",
-            "¡Hola! Soy tu asistente virtual de GOMARCO. Estoy capacitado para ayudarte con información sobre productos, políticas de la empresa y análisis de documentos. ¿Qué necesitas saber?"
+            "¡Hola! Soy el asistente de IA de GOMARCO. Estoy aquí para cualquier consulta relacionada con procesos o documentos. ¿En qué puedo ayudarte hoy?",
+            "¡Buenos días! Bienvenido al chatbot de GOMARCO. Puedo ayudarte con consultas sobre documentos o cualquier información que necesites. ¿Cómo puedo ayudarte?",
+            "¡Hola! Soy tu asistente virtual de GOMARCO. Estoy capacitado para ayudarte con información y análisis de documentos. ¿Qué necesitas saber?"
         };
 
         private readonly Dictionary<string, List<string>> _respuestasTematicas = new()
@@ -634,31 +634,110 @@ namespace ChatbotGomarco.Servicios
         {
             var mensajeLower = mensaje.ToLowerInvariant();
             
-            // Respuesta contextual sin abrumar con información
-            var tiposPrincipales = archivos.GroupBy(a => DeterminarTipoAnalisis(a.TipoContenido))
-                .OrderByDescending(g => g.Count())
-                .Take(2)
-                .Select(g => g.Key)
-                .ToList();
-
-            var respuesta = new StringBuilder();
-            respuesta.AppendLine($"Entiendo tu consulta: '{mensaje}'");
-            respuesta.AppendLine();
-            respuesta.AppendLine($"Tengo acceso a {archivos.Count} archivo(s) como contexto, principalmente:");
-
-            foreach (var tipo in tiposPrincipales)
+            try
             {
-                var cantidad = archivos.Count(a => DeterminarTipoAnalisis(a.TipoContenido) == tipo);
-                respuesta.AppendLine($"• {cantidad} {tipo}(s)");
+                // 1. ANÁLISIS SEMÁNTICO DEL MENSAJE
+                var intencionUsuario = AnalizarIntencionUsuario(mensaje);
+                var palabrasClave = ExtraerPalabrasClave(mensaje);
+
+                // 2. BÚSQUEDA EN EL CONTENIDO DE LOS ARCHIVOS
+                var resultadosBusqueda = await BuscarEnArchivosAsync(palabrasClave, archivos);
+
+                var respuesta = new StringBuilder();
+
+                if (resultadosBusqueda.Any())
+                {
+                    respuesta.AppendLine($"🔍 **Encontré información relevante para tu consulta:** \"{mensaje}\"");
+                    respuesta.AppendLine();
+
+                    // Mostrar resultados más relevantes
+                    foreach (var resultado in resultadosBusqueda.Take(3))
+                    {
+                        respuesta.AppendLine($"📄 **En: {resultado.NombreArchivo}**");
+                        respuesta.AppendLine($"📍 **Contexto encontrado:**");
+                        respuesta.AppendLine($"```");
+                        respuesta.AppendLine(resultado.ContextoEncontrado);
+                        respuesta.AppendLine($"```");
+                        respuesta.AppendLine($"🎯 **Relevancia:** {resultado.PorcentajeRelevancia:F1}%");
+                        respuesta.AppendLine();
+                    }
+
+                    // Generar respuesta inteligente basada en los resultados
+                    var respuestaGenerada = GenerarRespuestaBasadaEnContexto(mensaje, resultadosBusqueda, intencionUsuario);
+                    if (!string.IsNullOrEmpty(respuestaGenerada))
+                    {
+                        respuesta.AppendLine("🧠 **Respuesta generada:**");
+                        respuesta.AppendLine(respuestaGenerada);
+                        respuesta.AppendLine();
+                    }
+
+                    if (resultadosBusqueda.Count > 3)
+                    {
+                        respuesta.AppendLine($"💡 Encontré {resultadosBusqueda.Count - 3} resultado(s) adicional(es). ¿Te gustaría que profundice en algún archivo específico?");
+                    }
+                }
+                else
+                {
+                    // Respuesta contextual cuando no encuentra coincidencias directas
+                    var tiposPrincipales = archivos.GroupBy(a => DeterminarTipoAnalisis(a.TipoContenido))
+                        .OrderByDescending(g => g.Count())
+                        .Take(2)
+                        .Select(g => g.Key)
+                        .ToList();
+
+                    respuesta.AppendLine($"🤔 No encontré coincidencias directas para: \"{mensaje}\"");
+                    respuesta.AppendLine();
+                    respuesta.AppendLine($"Tengo acceso a {archivos.Count} archivo(s) como contexto:");
+
+                    foreach (var tipo in tiposPrincipales)
+                    {
+                        var cantidad = archivos.Count(a => DeterminarTipoAnalisis(a.TipoContenido) == tipo);
+                        respuesta.AppendLine($"• {cantidad} {tipo}(s)");
+                    }
+
+                    respuesta.AppendLine();
+                    respuesta.AppendLine("💡 **Sugerencias para mejorar tu búsqueda:**");
+
+                    // Sugerencias inteligentes basadas en la intención
+                    var sugerencias = GenerarSugerenciasBusqueda(intencionUsuario, archivos);
+                    foreach (var sugerencia in sugerencias)
+                    {
+                        respuesta.AppendLine($"• {sugerencia}");
+                    }
+                }
+
+                return respuesta.ToString();
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en respuesta inteligente con contexto");
+                
+                // Fallback a la respuesta original
+                var tiposPrincipales = archivos.GroupBy(a => DeterminarTipoAnalisis(a.TipoContenido))
+                    .OrderByDescending(g => g.Count())
+                    .Take(2)
+                    .Select(g => g.Key)
+                    .ToList();
 
-            respuesta.AppendLine();
-            respuesta.AppendLine("🎯 **Para una respuesta más precisa:**");
-            respuesta.AppendLine("• Menciona un archivo específico por su nombre");
-            respuesta.AppendLine("• Pregunta 'qué archivos tengo' para ver la lista completa");
-            respuesta.AppendLine("• Haz una consulta más específica sobre el tema que te interesa");
+                var respuesta = new StringBuilder();
+                respuesta.AppendLine($"Entiendo tu consulta: '{mensaje}'");
+                respuesta.AppendLine();
+                respuesta.AppendLine($"Tengo acceso a {archivos.Count} archivo(s) como contexto, principalmente:");
 
-            return respuesta.ToString();
+                foreach (var tipo in tiposPrincipales)
+                {
+                    var cantidad = archivos.Count(a => DeterminarTipoAnalisis(a.TipoContenido) == tipo);
+                    respuesta.AppendLine($"• {cantidad} {tipo}(s)");
+                }
+
+                respuesta.AppendLine();
+                respuesta.AppendLine("🎯 **Para una respuesta más precisa:**");
+                respuesta.AppendLine("• Menciona un archivo específico por su nombre");
+                respuesta.AppendLine("• Pregunta 'qué archivos tengo' para ver la lista completa");
+                respuesta.AppendLine("• Haz una consulta más específica sobre el tema que te interesa");
+
+                return respuesta.ToString();
+            }
         }
 
         private string GenerarResumenContenidoEspecifico(ArchivoSubido archivo)
@@ -764,8 +843,20 @@ namespace ChatbotGomarco.Servicios
                 var palabras = contenido.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 var lineas = contenido.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-                // Estadísticas básicas
+                // Estadísticas básicas mejoradas
+                var caracteristicas = AnalyzarCaracteristicasContenido(contenido);
                 resumen.AppendLine($"**Contenido analizado:** {palabras.Length:N0} palabras en {lineas.Length:N0} líneas");
+                resumen.AppendLine($"**Complejidad estimada:** {caracteristicas.ComplejidadLectura}");
+                resumen.AppendLine($"**Idioma detectado:** {caracteristicas.IdiomaDetectado}");
+                resumen.AppendLine();
+
+                // Categorización automática del documento
+                var categoria = CategorizarDocumento(contenido);
+                if (!string.IsNullOrEmpty(categoria))
+                {
+                    resumen.AppendLine($"📂 **Categoría identificada:** {categoria}");
+                    resumen.AppendLine();
+                }
 
                 switch (tipoContenido)
                 {
@@ -946,6 +1037,462 @@ namespace ChatbotGomarco.Servicios
 
             return resumen.ToString();
         }
+
+        #region Métodos de análisis semántico avanzado
+
+        private CaracteristicasContenido AnalyzarCaracteristicasContenido(string contenido)
+        {
+            var caracteristicas = new CaracteristicasContenido();
+
+            try
+            {
+                var palabras = contenido.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var oraciones = contenido.Split('.', StringSplitOptions.RemoveEmptyEntries);
+
+                // Calcular complejidad de lectura (basado en longitud promedio de palabras y oraciones)
+                var longitudPromedioPalabras = palabras.Average(p => p.Length);
+                var palabrasPorOracion = palabras.Length / (float)Math.Max(1, oraciones.Length);
+
+                caracteristicas.ComplejidadLectura = (longitudPromedioPalabras, palabrasPorOracion) switch
+                {
+                    ( < 4.5f, < 15f) => "Básica (fácil de leer)",
+                    ( < 5.5f, < 20f) => "Intermedia (lectura estándar)",
+                    ( < 6.5f, < 25f) => "Avanzada (lectura compleja)",
+                    _ => "Experta (muy compleja)"
+                };
+
+                // Detección de idioma simple
+                var palabrasEspañol = new[] { "el", "la", "de", "que", "y", "a", "en", "un", "es", "se", "no", "te", "lo", "del", "con", "por", "para" };
+                var palabrasIngles = new[] { "the", "and", "to", "of", "a", "in", "is", "it", "you", "that", "he", "was", "for", "on", "are", "as", "with" };
+
+                var contenidoLower = contenido.ToLowerInvariant();
+                var conteoEspañol = palabrasEspañol.Sum(p => Regex.Matches(contenidoLower, $@"\b{p}\b").Count);
+                var conteoIngles = palabrasIngles.Sum(p => Regex.Matches(contenidoLower, $@"\b{p}\b").Count);
+
+                caracteristicas.IdiomaDetectado = conteoEspañol > conteoIngles ? "Español" : 
+                                                 conteoIngles > conteoEspañol ? "Inglés" : "Mixto/Indeterminado";
+
+                return caracteristicas;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error al analizar características del contenido");
+                return new CaracteristicasContenido 
+                { 
+                    ComplejidadLectura = "Indeterminada", 
+                    IdiomaDetectado = "Indeterminado" 
+                };
+            }
+        }
+
+        private string CategorizarDocumento(string contenido)
+        {
+            var contenidoLower = contenido.ToLowerInvariant();
+
+            var categorias = new Dictionary<string, string[]>
+            {
+                ["📋 Manual/Guía"] = new[] { "manual", "instrucciones", "guía", "procedimiento", "paso a paso", "cómo", "tutorial" },
+                ["📊 Informe/Análisis"] = new[] { "informe", "reporte", "análisis", "estudio", "investigación", "estadística", "conclusión", "resultado" },
+                ["💼 Documento Comercial"] = new[] { "propuesta", "cotización", "presupuesto", "factura", "contrato", "acuerdo", "venta", "cliente" },
+                ["🏢 Documento Corporativo"] = new[] { "política", "proceso", "empresa", "organización", "corporativo", "empleado", "recursos humanos" },
+                ["📚 Material Educativo"] = new[] { "capacitación", "entrenamiento", "curso", "formación", "aprendizaje", "conocimiento", "competencia" },
+                ["🔧 Documentación Técnica"] = new[] { "especificación", "técnico", "sistema", "software", "hardware", "configuración", "instalación" },
+                ["📈 Financiero"] = new[] { "financiero", "presupuesto", "costo", "precio", "inversión", "ganancia", "pérdida", "balance" },
+                ["📋 Catálogo/Producto"] = new[] { "catálogo", "producto", "características", "modelo", "especificaciones", "colchón", "gomarco" }
+            };
+
+            foreach (var categoria in categorias)
+            {
+                var coincidencias = categoria.Value.Count(palabra => contenidoLower.Contains(palabra));
+                if (coincidencias >= 2) // Al menos 2 palabras clave
+                {
+                    return categoria.Key;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private string AnalizarIntencionUsuario(string mensaje)
+        {
+            var mensajeLower = mensaje.ToLowerInvariant();
+
+            var intenciones = new Dictionary<string, string[]>
+            {
+                ["busqueda"] = new[] { "buscar", "encontrar", "localizar", "donde", "ubicar", "hallar" },
+                ["explicacion"] = new[] { "qué es", "cómo", "explicar", "definir", "significado", "concepto" },
+                ["comparacion"] = new[] { "comparar", "diferencia", "mejor", "peor", "versus", "vs", "diferente" },
+                ["listado"] = new[] { "listar", "enumerar", "mostrar", "cuáles", "todos", "lista" },
+                ["resumen"] = new[] { "resumir", "resumen", "sintetizar", "principales", "importante", "clave" },
+                ["detalle"] = new[] { "detallar", "detalles", "específico", "profundidad", "completo", "exhaustivo" },
+                ["procedimiento"] = new[] { "cómo hacer", "pasos", "proceso", "procedimiento", "método", "instrucciones" },
+                ["recomendacion"] = new[] { "recomendar", "sugerir", "aconsejar", "mejor opción", "qué elegir" }
+            };
+
+            foreach (var intencion in intenciones)
+            {
+                if (intencion.Value.Any(palabra => mensajeLower.Contains(palabra)))
+                {
+                    return intencion.Key;
+                }
+            }
+
+            return "general";
+        }
+
+        private List<string> ExtraerPalabrasClave(string mensaje)
+        {
+            var palabrasComunes = new HashSet<string> 
+            { 
+                "el", "la", "de", "que", "y", "a", "en", "un", "es", "se", "no", "te", "lo", "le", "da", "su", "por", "son", "con", "para", "al", "una", "las", "del", "los",
+                "me", "mi", "tu", "si", "como", "más", "pero", "muy", "ser", "todo", "ya", "sobre", "esto", "qué", "cómo", "dónde", "cuándo", "por qué", "puedes", "puede"
+            };
+
+            return Regex.Matches(mensaje.ToLowerInvariant(), @"\b[a-záéíóúñü]{3,}\b")
+                .Cast<Match>()
+                .Select(m => m.Value)
+                .Where(p => !palabrasComunes.Contains(p))
+                .Distinct()
+                .ToList();
+        }
+
+        private async Task<List<ResultadoBusqueda>> BuscarEnArchivosAsync(List<string> palabrasClave, List<ArchivoSubido> archivos)
+        {
+            var resultados = new List<ResultadoBusqueda>();
+
+            foreach (var archivo in archivos)
+            {
+                try
+                {
+                    // Solo buscar en archivos de texto por ahora
+                    if (!_servicioExtraccion.EsTipoCompatible(archivo.TipoContenido))
+                        continue;
+
+                    var rutaTemporal = await _servicioArchivos.DescargarArchivoTemporalAsync(archivo.Id);
+                    var contenido = await _servicioExtraccion.ExtraerTextoAsync(rutaTemporal, archivo.TipoContenido);
+
+                    // Limpiar archivo temporal
+                    if (File.Exists(rutaTemporal))
+                        File.Delete(rutaTemporal);
+
+                    if (string.IsNullOrWhiteSpace(contenido))
+                        continue;
+
+                    // Buscar coincidencias
+                    var coincidencias = BuscarCoincidenciasEnTexto(contenido, palabrasClave);
+
+                    foreach (var coincidencia in coincidencias)
+                    {
+                        resultados.Add(new ResultadoBusqueda
+                        {
+                            NombreArchivo = archivo.NombreOriginal,
+                            ContextoEncontrado = coincidencia.Contexto,
+                            PorcentajeRelevancia = coincidencia.Relevancia,
+                            TipoArchivo = archivo.TipoContenido,
+                            PosicionEnDocumento = coincidencia.Posicion
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al buscar en archivo: {Archivo}", archivo.NombreOriginal);
+                }
+            }
+
+            return resultados.OrderByDescending(r => r.PorcentajeRelevancia).ToList();
+        }
+
+        private List<CoincidenciaTexto> BuscarCoincidenciasEnTexto(string contenido, List<string> palabrasClave)
+        {
+            var coincidencias = new List<CoincidenciaTexto>();
+            var lineas = contenido.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = 0; i < lineas.Length; i++)
+            {
+                var linea = lineas[i];
+                var lineaLower = linea.ToLowerInvariant();
+                
+                var palabrasEncontradas = palabrasClave.Count(p => lineaLower.Contains(p.ToLowerInvariant()));
+                
+                if (palabrasEncontradas > 0)
+                {
+                    // Crear contexto con líneas adyacentes
+                    var inicioContexto = Math.Max(0, i - 2);
+                    var finContexto = Math.Min(lineas.Length - 1, i + 2);
+                    
+                    var contexto = string.Join("\n", lineas[inicioContexto..(finContexto + 1)]);
+                    var relevancia = (float)palabrasEncontradas / palabrasClave.Count * 100;
+
+                    coincidencias.Add(new CoincidenciaTexto
+                    {
+                        Contexto = contexto.Length > 300 ? contexto.Substring(0, 300) + "..." : contexto,
+                        Relevancia = relevancia,
+                        Posicion = i
+                    });
+                }
+            }
+
+            return coincidencias.Where(c => c.Relevancia >= 20) // Solo mostrar coincidencias con al menos 20% de relevancia
+                              .OrderByDescending(c => c.Relevancia)
+                              .Take(5)
+                              .ToList();
+        }
+
+        private string GenerarRespuestaBasadaEnContexto(string mensaje, List<ResultadoBusqueda> resultados, string intencion)
+        {
+            if (!resultados.Any()) return string.Empty;
+
+            var respuesta = new StringBuilder();
+            
+            try
+            {
+                switch (intencion)
+                {
+                    case "explicacion":
+                        respuesta.AppendLine("**Basándome en los documentos encontrados, puedo explicarte lo siguiente:**");
+                        respuesta.AppendLine();
+                        respuesta.AppendLine(SintetizarExplicacion(resultados));
+                        break;
+
+                    case "resumen":
+                        respuesta.AppendLine("**Aquí tienes un resumen de la información encontrada:**");
+                        respuesta.AppendLine();
+                        respuesta.AppendLine(GenerarResumenDeResultados(resultados));
+                        break;
+
+                    case "listado":
+                        respuesta.AppendLine("**He identificado los siguientes elementos:**");
+                        respuesta.AppendLine();
+                        respuesta.AppendLine(ExtraerElementosListado(resultados));
+                        break;
+
+                    case "comparacion":
+                        if (resultados.Count >= 2)
+                        {
+                            respuesta.AppendLine("**Comparando la información encontrada:**");
+                            respuesta.AppendLine();
+                            respuesta.AppendLine(GenerarComparacion(resultados));
+                        }
+                        break;
+
+                    default:
+                        respuesta.AppendLine("**Con base en la información encontrada:**");
+                        respuesta.AppendLine();
+                        respuesta.AppendLine(GenerarRespuestaGeneral(resultados));
+                        break;
+                }
+
+                return respuesta.ToString();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error al generar respuesta basada en contexto");
+                return "Encontré información relevante, pero tuve dificultades para procesarla completamente. ¿Podrías ser más específico en tu consulta?";
+            }
+        }
+
+        private List<string> GenerarSugerenciasBusqueda(string intencion, List<ArchivoSubido> archivos)
+        {
+            var sugerencias = new List<string>();
+
+            try
+            {
+                // Sugerencias basadas en tipos de archivos disponibles
+                var tiposArchivos = archivos.Select(a => DeterminarTipoAnalisis(a.TipoContenido)).Distinct().ToList();
+
+                foreach (var tipo in tiposArchivos.Take(3))
+                {
+                    switch (tipo)
+                    {
+                        case "📄 Documento PDF":
+                            sugerencias.Add("Intenta buscar por temas específicos como 'proceso', 'procedimiento' o nombres de secciones");
+                            break;
+                        case "📊 Hoja Excel (.xlsx)":
+                            sugerencias.Add("Busca por datos numéricos, nombres de columnas o información específica de tablas");
+                            break;
+                        case "📝 Documento Word (.docx)":
+                            sugerencias.Add("Prueba con palabras clave del título, encabezados o contenido principal");
+                            break;
+                    }
+                }
+
+                // Sugerencias basadas en la intención
+                switch (intencion)
+                {
+                    case "busqueda":
+                        sugerencias.Add("Usa términos más específicos o combina varias palabras clave");
+                        break;
+                    case "explicacion":
+                        sugerencias.Add("Pregunta '¿qué es [término específico]?' o '¿cómo funciona [proceso]?'");
+                        break;
+                    case "listado":
+                        sugerencias.Add("Pregunta 'lista de', 'cuáles son' o 'enumera los'");
+                        break;
+                }
+
+                // Sugerencias generales
+                if (!sugerencias.Any())
+                {
+                    sugerencias.AddRange(new[]
+                    {
+                        "Menciona un archivo específico por su nombre",
+                        "Usa palabras clave más específicas relacionadas con tu búsqueda",
+                        "Pregunta por un tema o concepto particular"
+                    });
+                }
+
+                return sugerencias.Take(4).ToList();
+            }
+            catch
+            {
+                return new List<string> { "Intenta ser más específico en tu consulta" };
+            }
+        }
+
+        #endregion
+
+        #region Métodos auxiliares para generación de respuestas
+
+        private string SintetizarExplicacion(List<ResultadoBusqueda> resultados)
+        {
+            var explicacion = new StringBuilder();
+            
+            // Combinar contextos más relevantes
+            var contextosRelevantes = resultados.Take(2).Select(r => r.ContextoEncontrado).ToList();
+            
+            if (contextosRelevantes.Any())
+            {
+                var contenidoCombinado = string.Join("\n\n", contextosRelevantes);
+                var primerasLineas = contenidoCombinado.Split('\n').Take(5);
+                
+                foreach (var linea in primerasLineas)
+                {
+                    if (!string.IsNullOrWhiteSpace(linea))
+                    {
+                        explicacion.AppendLine($"• {linea.Trim()}");
+                    }
+                }
+            }
+            
+            return explicacion.ToString();
+        }
+
+        private string GenerarResumenDeResultados(List<ResultadoBusqueda> resultados)
+        {
+            var resumen = new StringBuilder();
+            
+            var puntosUnicos = new HashSet<string>();
+            
+            foreach (var resultado in resultados.Take(3))
+            {
+                var lineas = resultado.ContextoEncontrado.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var linea in lineas.Take(2))
+                {
+                    var lineaLimpia = linea.Trim();
+                    if (lineaLimpia.Length > 10 && puntosUnicos.Add(lineaLimpia))
+                    {
+                        resumen.AppendLine($"• {lineaLimpia}");
+                    }
+                }
+            }
+            
+            return resumen.ToString();
+        }
+
+        private string ExtraerElementosListado(List<ResultadoBusqueda> resultados)
+        {
+            var elementos = new StringBuilder();
+            var listasEncontradas = new HashSet<string>();
+            
+            foreach (var resultado in resultados)
+            {
+                var lineas = resultado.ContextoEncontrado.Split('\n');
+                foreach (var linea in lineas)
+                {
+                    var lineaTrimmed = linea.Trim();
+                    if ((lineaTrimmed.StartsWith("•") || lineaTrimmed.StartsWith("-") || 
+                         Regex.IsMatch(lineaTrimmed, @"^\d+\.")) && 
+                        listasEncontradas.Add(lineaTrimmed))
+                    {
+                        elementos.AppendLine(lineaTrimmed);
+                    }
+                }
+            }
+            
+            return elementos.Length > 0 ? elementos.ToString() : 
+                   "No se encontraron listas específicas, pero hay información relevante en los contextos mostrados arriba.";
+        }
+
+        private string GenerarComparacion(List<ResultadoBusqueda> resultados)
+        {
+            var comparacion = new StringBuilder();
+            
+            if (resultados.Count >= 2)
+            {
+                comparacion.AppendLine($"**Archivo 1 ({resultados[0].NombreArchivo}):**");
+                comparacion.AppendLine(resultados[0].ContextoEncontrado.Split('\n').First());
+                comparacion.AppendLine();
+                
+                comparacion.AppendLine($"**Archivo 2 ({resultados[1].NombreArchivo}):**");
+                comparacion.AppendLine(resultados[1].ContextoEncontrado.Split('\n').First());
+                comparacion.AppendLine();
+                
+                comparacion.AppendLine("*Para una comparación más detallada, especifica qué aspectos te interesan comparar.*");
+            }
+            
+            return comparacion.ToString();
+        }
+
+        private string GenerarRespuestaGeneral(List<ResultadoBusqueda> resultados)
+        {
+            var respuesta = new StringBuilder();
+            
+            var mejorResultado = resultados.First();
+            var primerasLineas = mejorResultado.ContextoEncontrado.Split('\n')
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .Take(3);
+            
+            foreach (var linea in primerasLineas)
+            {
+                respuesta.AppendLine(linea.Trim());
+            }
+            
+            if (resultados.Count > 1)
+            {
+                respuesta.AppendLine();
+                respuesta.AppendLine($"También encontré información relacionada en {resultados.Count - 1} archivo(s) adicional(es).");
+            }
+            
+            return respuesta.ToString();
+        }
+
+        #endregion
+
+        #region Clases auxiliares para análisis semántico
+
+        public class CaracteristicasContenido
+        {
+            public string ComplejidadLectura { get; set; } = string.Empty;
+            public string IdiomaDetectado { get; set; } = string.Empty;
+        }
+
+        public class ResultadoBusqueda
+        {
+            public string NombreArchivo { get; set; } = string.Empty;
+            public string ContextoEncontrado { get; set; } = string.Empty;
+            public float PorcentajeRelevancia { get; set; }
+            public string TipoArchivo { get; set; } = string.Empty;
+            public int PosicionEnDocumento { get; set; }
+        }
+
+        public class CoincidenciaTexto
+        {
+            public string Contexto { get; set; } = string.Empty;
+            public float Relevancia { get; set; }
+            public int Posicion { get; set; }
+        }
+
+        #endregion
 
         private List<string> ExtraerTemasPrincipales(string contenido)
         {
