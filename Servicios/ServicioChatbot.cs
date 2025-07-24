@@ -15,6 +15,7 @@ namespace ChatbotGomarco.Servicios
         private readonly IServicioArchivos _servicioArchivos;
         private readonly IServicioExtraccionContenido _servicioExtraccion;
         private readonly ILogger<ServicioChatbot> _logger;
+        private readonly IServicioIA _servicioIA;
         
         // Respuestas predeterminadas para el chatbot (simulación de IA)
         private readonly List<string> _respuestasSaludo = new()
@@ -46,21 +47,29 @@ namespace ChatbotGomarco.Servicios
             }
         };
 
-        public ServicioChatbot(IServicioArchivos servicioArchivos, IServicioExtraccionContenido servicioExtraccion, ILogger<ServicioChatbot> logger)
+        public ServicioChatbot(IServicioArchivos servicioArchivos, IServicioExtraccionContenido servicioExtraccion, ILogger<ServicioChatbot> logger, IServicioIA servicioIA)
         {
             _servicioArchivos = servicioArchivos;
             _servicioExtraccion = servicioExtraccion;
             _logger = logger;
+            _servicioIA = servicioIA;
         }
 
-        public async Task<string> ProcesarMensajeAsync(string mensaje, string idSesion, List<ArchivoSubido>? archivosContexto = null)
+        public async Task<string> ProcesarMensajeAsync(string mensaje, string idSesion, List<ArchivoSubido>? archivosContexto = null, List<MensajeChat>? historialConversacion = null)
         {
             try
             {
                 _logger.LogInformation("Procesando mensaje para sesión: {Sesion}", idSesion);
 
-                // Simular tiempo de procesamiento
-                await Task.Delay(1000);
+                // PRIORIDAD 1: USAR IA SI ESTÁ DISPONIBLE
+                if (_servicioIA.EstaDisponible())
+                {
+                    return await ProcesarMensajeConIAAsync(mensaje, await ObtenerContextoArchivos(archivosContexto), historialConversacion);
+                }
+
+                // FALLBACK: Sistema tradicional
+                _logger.LogInformation("IA no disponible, usando sistema tradicional");
+                await Task.Delay(500); // Reducir tiempo de simulación
 
                 var mensajeLower = mensaje.ToLowerInvariant();
                 
@@ -114,124 +123,124 @@ namespace ChatbotGomarco.Servicios
         {
             try
             {
-                _logger.LogInformation("Analizando contenido real del archivo: {Nombre}", archivo.NombreOriginal);
+                _logger.LogInformation("Analizando contenido específico para trabajador: {Nombre}", archivo.NombreOriginal);
 
                 // Obtener archivo temporal para análisis
                 var rutaTemporal = await _servicioArchivos.DescargarArchivoTemporalAsync(archivo.Id);
                 
                 var resultado = new StringBuilder();
-                resultado.AppendLine($"📄 **Análisis completo de: {archivo.NombreOriginal}**");
-                resultado.AppendLine($"📅 Fecha de subida: {archivo.FechaSubida:dd/MM/yyyy HH:mm}");
-                resultado.AppendLine($"📊 Tamaño: {FormatearTamaño(archivo.TamañoOriginal)}");
-                resultado.AppendLine($"🔍 Tipo: {DeterminarTipoAnalisis(archivo.TipoContenido)}");
+                resultado.AppendLine($"📋 **{archivo.NombreOriginal}**");
+                resultado.AppendLine($"📅 Cargado: {archivo.FechaSubida:dd/MM/yyyy}");
                 resultado.AppendLine();
 
                 // Verificar si el tipo es compatible para extracción
                 if (_servicioExtraccion.EsTipoCompatible(archivo.TipoContenido))
                 {
-                    // *** ANÁLISIS REAL DEL CONTENIDO ***
-                    _logger.LogInformation("Extrayendo contenido real del archivo...");
+                    _logger.LogInformation("Extrayendo datos específicos del negocio...");
                     
-                    // Extraer metadatos reales
-                    var metadatos = await _servicioExtraccion.ExtraerMetadatosAsync(rutaTemporal, archivo.TipoContenido);
-                    if (!string.IsNullOrEmpty(metadatos.Titulo))
-                    {
-                        resultado.AppendLine($"📋 **Título del documento:** {metadatos.Titulo}");
-                    }
-                    if (!string.IsNullOrEmpty(metadatos.Autor))
-                    {
-                        resultado.AppendLine($"👤 **Autor:** {metadatos.Autor}");
-                    }
-                    if (metadatos.NumeroPaginas > 0)
-                    {
-                        resultado.AppendLine($"📃 **Páginas:** {metadatos.NumeroPaginas}");
-                    }
-                    if (metadatos.NumeroPalabras > 0)
-                    {
-                        resultado.AppendLine($"📝 **Palabras:** {metadatos.NumeroPalabras:N0}");
-                    }
-                    resultado.AppendLine();
-
                     // Extraer contenido real
                     var contenidoCompleto = await _servicioExtraccion.ExtraerTextoAsync(rutaTemporal, archivo.TipoContenido);
                     
                     if (!string.IsNullOrWhiteSpace(contenidoCompleto))
                     {
-                        resultado.AppendLine("📖 **CONTENIDO EXTRAÍDO:**");
-                        resultado.AppendLine("```");
+                        // ANÁLISIS ESPECÍFICO PARA TRABAJADORES
+                        var datosEspecificos = ExtraerDatosEspecificosNegocio(contenidoCompleto, archivo.TipoContenido);
                         
-                        // Mostrar primeras líneas del contenido (limitado para legibilidad)
-                        var lineasContenido = contenidoCompleto.Split('\n');
-                        var lineasMostrar = Math.Min(50, lineasContenido.Length);
-                        
-                        for (int i = 0; i < lineasMostrar; i++)
+                        if (datosEspecificos.Any())
                         {
-                            var linea = lineasContenido[i].Trim();
-                            if (!string.IsNullOrEmpty(linea))
+                            resultado.AppendLine("🎯 **INFORMACIÓN CLAVE ENCONTRADA:**");
+                            foreach (var dato in datosEspecificos)
                             {
-                                resultado.AppendLine(linea);
-                            }
-                        }
-                        
-                        if (lineasContenido.Length > lineasMostrar)
-                        {
-                            resultado.AppendLine($"\n... y {lineasContenido.Length - lineasMostrar} líneas más de contenido.");
-                        }
-                        
-                        resultado.AppendLine("```");
-                        resultado.AppendLine();
-
-                        // Análisis de estructura real
-                        var estructura = await _servicioExtraccion.AnalizarEstructuraAsync(rutaTemporal, archivo.TipoContenido);
-                        
-                        resultado.AppendLine("🏗️ **ESTRUCTURA DEL DOCUMENTO:**");
-                        if (estructura.Encabezados.Any())
-                        {
-                            resultado.AppendLine("**Encabezados encontrados:**");
-                            foreach (var encabezado in estructura.Encabezados.Take(10))
-                            {
-                                resultado.AppendLine($"• {encabezado}");
-                            }
-                            if (estructura.Encabezados.Count > 10)
-                            {
-                                resultado.AppendLine($"• ... y {estructura.Encabezados.Count - 10} encabezados más");
+                                resultado.AppendLine($"• **{dato.Key}:** {dato.Value}");
                             }
                             resultado.AppendLine();
                         }
 
-                        if (estructura.NumeroTablas > 0)
+                        // EXTRACCIÓN DE DATOS ACTIONABLES
+                        var datosActionables = ExtraerInformacionActionable(contenidoCompleto);
+                        
+                        if (datosActionables.Precios.Any())
                         {
-                            resultado.AppendLine($"📊 **Tablas:** {estructura.NumeroTablas} tabla(s) detectada(s)");
+                            resultado.AppendLine("💰 **PRECIOS Y COSTOS:**");
+                            foreach (var precio in datosActionables.Precios.Take(5))
+                            {
+                                resultado.AppendLine($"• {precio}");
+                            }
+                            resultado.AppendLine();
                         }
 
-                        if (estructura.NumeroImagenes > 0)
+                        if (datosActionables.Fechas.Any())
                         {
-                            resultado.AppendLine($"🖼️ **Imágenes:** {estructura.NumeroImagenes} imagen(es) detectada(s)");
+                            resultado.AppendLine("📅 **FECHAS IMPORTANTES:**");
+                            foreach (var fecha in datosActionables.Fechas.Take(5))
+                            {
+                                resultado.AppendLine($"• {fecha}");
+                            }
+                            resultado.AppendLine();
                         }
 
-                        resultado.AppendLine($"ℹ️ **Resumen:** {estructura.ResumenEstructural}");
+                        if (datosActionables.Contactos.Any())
+                        {
+                            resultado.AppendLine("📞 **INFORMACIÓN DE CONTACTO:**");
+                            foreach (var contacto in datosActionables.Contactos.Take(5))
+                            {
+                                resultado.AppendLine($"• {contacto}");
+                            }
+                            resultado.AppendLine();
+                        }
+
+                        if (datosActionables.Procedimientos.Any())
+                        {
+                            resultado.AppendLine("📋 **PROCEDIMIENTOS Y PASOS:**");
+                            foreach (var procedimiento in datosActionables.Procedimientos.Take(3))
+                            {
+                                resultado.AppendLine($"• {procedimiento}");
+                            }
+                            resultado.AppendLine();
+                        }
+
+                        if (datosActionables.Numeros.Any())
+                        {
+                            resultado.AppendLine("🔢 **NÚMEROS Y CANTIDADES RELEVANTES:**");
+                            foreach (var numero in datosActionables.Numeros.Take(5))
+                            {
+                                resultado.AppendLine($"• {numero}");
+                            }
+                            resultado.AppendLine();
+                        }
+
+                        // CONTENIDO DISPONIBLE PARA CONSULTAS
+                        var totalPalabras = contenidoCompleto.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+                        resultado.AppendLine("🔍 **CONTENIDO DISPONIBLE PARA CONSULTAS:**");
+                        resultado.AppendLine($"• {totalPalabras:N0} palabras de contenido indexado");
+                        resultado.AppendLine($"• Búsqueda por palabras clave activada");
+                        resultado.AppendLine($"• Respuestas contextuales habilitadas");
                         resultado.AppendLine();
 
-                        // Generar un resumen inteligente del contenido
-                        var resumenInteligente = GenerarResumenInteligente(contenidoCompleto, archivo.TipoContenido);
-                        resultado.AppendLine("🧠 **RESUMEN INTELIGENTE:**");
-                        resultado.AppendLine(resumenInteligente);
+                        // SUGERENCIAS DE CONSULTAS ÚTILES
+                        var sugerenciasConsulta = GenerarSugerenciasConsultaEspecificas(contenidoCompleto, archivo.TipoContenido);
+                        if (sugerenciasConsulta.Any())
+                        {
+                            resultado.AppendLine("💡 **CONSULTAS SUGERIDAS:**");
+                            foreach (var sugerencia in sugerenciasConsulta.Take(4))
+                            {
+                                resultado.AppendLine($"• \"{sugerencia}\"");
+                            }
+                        }
                     }
                     else
                     {
                         resultado.AppendLine("⚠️ **No se pudo extraer contenido textual del archivo.**");
-                        resultado.AppendLine("Esto puede deberse a que el archivo está protegido, corrupto, o contiene principalmente imágenes sin texto.");
+                        resultado.AppendLine("El archivo puede estar protegido, corrupto, o contener principalmente imágenes sin texto.");
                     }
                 }
                 else
                 {
-                    resultado.AppendLine("⚠️ **Tipo de archivo no compatible para análisis de contenido.**");
-                    resultado.AppendLine("**Tipos compatibles:**");
-                    resultado.AppendLine("• **Documentos:** PDF, Word (.doc/.docx), Excel (.xls/.xlsx), PowerPoint (.ppt/.pptx), RTF");
-                    resultado.AppendLine("• **Texto y datos:** TXT, CSV, JSON, XML");
-                    resultado.AppendLine("• **Imágenes:** JPG, PNG, GIF, BMP, SVG, WebP, TIFF");
-                    resultado.AppendLine("• **Multimedia:** MP3, WAV, AAC, MP4, AVI, MKV, MOV");
-                    resultado.AppendLine("• **Archivos comprimidos:** ZIP, RAR, 7Z, TAR, GZ");
+                    resultado.AppendLine("⚠️ **Tipo de archivo no compatible para análisis de contenido específico.**");
+                    resultado.AppendLine("**Para análisis completo, usa archivos:**");
+                    resultado.AppendLine("• **Documentos:** PDF, Word, Excel, PowerPoint");
+                    resultado.AppendLine("• **Datos:** TXT, CSV, JSON");
+                    resultado.AppendLine("• **Imágenes:** JPG, PNG (con OCR para extraer texto)");
                 }
 
                 // Limpiar archivo temporal
@@ -242,7 +251,7 @@ namespace ChatbotGomarco.Servicios
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al analizar archivo: {Id}", archivo.Id);
+                _logger.LogError(ex, "Error al analizar archivo específicamente para trabajador: {Id}", archivo.Id);
                 return $"❌ Error al analizar el archivo {archivo.NombreOriginal}: {ex.Message}";
             }
         }
@@ -1246,40 +1255,88 @@ namespace ChatbotGomarco.Servicios
             
             try
             {
+                // ANÁLISIS ESPECÍFICO PARA TRABAJADORES
+                var datosEspecificos = AnalizarDatosEnResultados(resultados);
+                
                 switch (intencion)
                 {
                     case "explicacion":
-                        respuesta.AppendLine("**Basándome en los documentos encontrados, puedo explicarte lo siguiente:**");
+                        respuesta.AppendLine("📋 **EXPLICACIÓN BASADA EN LOS DOCUMENTOS:**");
                         respuesta.AppendLine();
-                        respuesta.AppendLine(SintetizarExplicacion(resultados));
+                        respuesta.AppendLine(SintetizarExplicacionParaTrabajador(resultados, datosEspecificos));
                         break;
 
                     case "resumen":
-                        respuesta.AppendLine("**Aquí tienes un resumen de la información encontrada:**");
+                        respuesta.AppendLine("📊 **RESUMEN DE INFORMACIÓN CLAVE:**");
                         respuesta.AppendLine();
-                        respuesta.AppendLine(GenerarResumenDeResultados(resultados));
+                        respuesta.AppendLine(GenerarResumenOrientadoTrabajador(resultados, datosEspecificos));
                         break;
 
                     case "listado":
-                        respuesta.AppendLine("**He identificado los siguientes elementos:**");
+                        respuesta.AppendLine("📝 **ELEMENTOS IDENTIFICADOS:**");
                         respuesta.AppendLine();
-                        respuesta.AppendLine(ExtraerElementosListado(resultados));
+                        respuesta.AppendLine(ExtraerElementosParaTrabajador(resultados, datosEspecificos));
                         break;
 
                     case "comparacion":
                         if (resultados.Count >= 2)
                         {
-                            respuesta.AppendLine("**Comparando la información encontrada:**");
+                            respuesta.AppendLine("⚖️ **COMPARACIÓN DE DATOS:**");
                             respuesta.AppendLine();
-                            respuesta.AppendLine(GenerarComparacion(resultados));
+                            respuesta.AppendLine(GenerarComparacionTrabajador(resultados, datosEspecificos));
                         }
                         break;
 
-                    default:
-                        respuesta.AppendLine("**Con base en la información encontrada:**");
+                    case "busqueda":
+                        respuesta.AppendLine("🔍 **INFORMACIÓN ENCONTRADA:**");
                         respuesta.AppendLine();
-                        respuesta.AppendLine(GenerarRespuestaGeneral(resultados));
+                        respuesta.AppendLine(GenerarRespuestaBusquedaTrabajador(resultados, datosEspecificos));
                         break;
+
+                    default:
+                        respuesta.AppendLine("💼 **INFORMACIÓN DISPONIBLE PARA TU TRABAJO:**");
+                        respuesta.AppendLine();
+                        respuesta.AppendLine(GenerarRespuestaGeneralTrabajador(resultados, datosEspecificos));
+                        break;
+                }
+
+                // DATOS ESPECÍFICOS ENCONTRADOS
+                if (datosEspecificos.TieneInformacionEspecifica())
+                {
+                    respuesta.AppendLine();
+                    respuesta.AppendLine("🎯 **DATOS ESPECÍFICOS DETECTADOS:**");
+                    
+                    if (datosEspecificos.PreciosEncontrados.Any())
+                    {
+                        respuesta.AppendLine($"💰 **Precios:** {string.Join(", ", datosEspecificos.PreciosEncontrados.Take(3))}");
+                    }
+                    
+                    if (datosEspecificos.FechasEncontradas.Any())
+                    {
+                        respuesta.AppendLine($"📅 **Fechas:** {string.Join(", ", datosEspecificos.FechasEncontradas.Take(3))}");
+                    }
+                    
+                    if (datosEspecificos.ContactosEncontrados.Any())
+                    {
+                        respuesta.AppendLine($"📞 **Contactos:** {string.Join(", ", datosEspecificos.ContactosEncontrados.Take(2))}");
+                    }
+                    
+                    if (datosEspecificos.NumerosEncontrados.Any())
+                    {
+                        respuesta.AppendLine($"🔢 **Cantidades:** {string.Join(", ", datosEspecificos.NumerosEncontrados.Take(3))}");
+                    }
+                }
+
+                // ACCIONES SUGERIDAS
+                var accionesSugeridas = GenerarAccionesSugeridasParaTrabajador(mensaje, resultados, datosEspecificos);
+                if (accionesSugeridas.Any())
+                {
+                    respuesta.AppendLine();
+                    respuesta.AppendLine("💡 **ACCIONES SUGERIDAS:**");
+                    foreach (var accion in accionesSugeridas.Take(3))
+                    {
+                        respuesta.AppendLine($"• {accion}");
+                    }
                 }
 
                 return respuesta.ToString();
@@ -1468,6 +1525,466 @@ namespace ChatbotGomarco.Servicios
 
         #endregion
 
+        #region Métodos específicos para trabajadores
+
+        private Dictionary<string, string> ExtraerDatosEspecificosNegocio(string contenido, string tipoContenido)
+        {
+            var datos = new Dictionary<string, string>();
+
+            try
+            {
+                var contenidoLower = contenido.ToLowerInvariant();
+
+                // PRODUCTOS GOMARCO
+                if (contenidoLower.Contains("colchón") || contenidoLower.Contains("colchon") || contenidoLower.Contains("gomarco"))
+                {
+                    var modelos = ExtraerModelos(contenido);
+                    if (modelos.Any())
+                        datos["Modelos de Colchones"] = string.Join(", ", modelos.Take(3));
+                }
+
+                // EMPRESA Y ORGANIZACIÓN
+                var empresa = ExtraerInformacionEmpresa(contenido);
+                if (!string.IsNullOrEmpty(empresa))
+                    datos["Información de Empresa"] = empresa;
+
+                // CÓDIGOS Y REFERENCIAS
+                var codigos = ExtraerCodigos(contenido);
+                if (codigos.Any())
+                    datos["Códigos/Referencias"] = string.Join(", ", codigos.Take(5));
+
+                // UBICACIONES Y DIRECCIONES
+                var ubicaciones = ExtraerUbicaciones(contenido);
+                if (ubicaciones.Any())
+                    datos["Ubicaciones"] = string.Join(", ", ubicaciones.Take(3));
+
+                // RESPONSABLES Y ROLES
+                var responsables = ExtraerResponsables(contenido);
+                if (responsables.Any())
+                    datos["Personal/Responsables"] = string.Join(", ", responsables.Take(3));
+
+                return datos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error extrayendo datos específicos del negocio");
+                return datos;
+            }
+        }
+
+        private InformacionActionable ExtraerInformacionActionable(string contenido)
+        {
+            var info = new InformacionActionable();
+
+            try
+            {
+                // PRECIOS Y COSTOS
+                info.Precios = ExtraerPrecios(contenido);
+
+                // FECHAS IMPORTANTES
+                info.Fechas = ExtraerFechasImportantes(contenido);
+
+                // CONTACTOS
+                info.Contactos = ExtraerContactos(contenido);
+
+                // PROCEDIMIENTOS Y PASOS
+                info.Procedimientos = ExtraerProcedimientos(contenido);
+
+                // NÚMEROS Y CANTIDADES
+                info.Numeros = ExtraerNumerosRelevantes(contenido);
+
+                return info;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error extrayendo información actionable");
+                return info;
+            }
+        }
+
+        private List<string> ExtraerPrecios(string contenido)
+        {
+            var precios = new List<string>();
+
+            try
+            {
+                // Patrones de precios comunes
+                var patronesPrecios = new[]
+                {
+                    @"(\$[\d,]+\.?\d*)",                    // $1,234.56
+                    @"([\d,]+\.?\d*\s*€)",                  // 1234.56 €
+                    @"([\d,]+\.?\d*\s*pesos)",              // 1234 pesos
+                    @"(precio[:\s]+[\$]?[\d,]+\.?\d*)",     // precio: $1234
+                    @"(costo[:\s]+[\$]?[\d,]+\.?\d*)",      // costo: 1234
+                    @"(vale[:\s]+[\$]?[\d,]+\.?\d*)"        // vale: $1234
+                };
+
+                var lineas = contenido.Split('\n');
+                
+                foreach (var linea in lineas)
+                {
+                    foreach (var patron in patronesPrecios)
+                    {
+                        var coincidencias = Regex.Matches(linea, patron, RegexOptions.IgnoreCase);
+                        foreach (Match coincidencia in coincidencias)
+                        {
+                            var contexto = linea.Trim();
+                            if (contexto.Length > 80)
+                                contexto = contexto.Substring(0, 80) + "...";
+                            
+                            precios.Add(contexto);
+                        }
+                    }
+                }
+
+                return precios.Distinct().Take(10).ToList();
+            }
+            catch
+            {
+                return precios;
+            }
+        }
+
+        private List<string> ExtraerFechasImportantes(string contenido)
+        {
+            var fechas = new List<string>();
+
+            try
+            {
+                var patronesFechas = new[]
+                {
+                    @"(\d{1,2}\/\d{1,2}\/\d{4})",                    // dd/mm/yyyy
+                    @"(\d{1,2}-\d{1,2}-\d{4})",                      // dd-mm-yyyy
+                    @"(vence[:\s]+\d{1,2}\/\d{1,2}\/\d{4})",         // vence: dd/mm/yyyy
+                    @"(válido hasta[:\s]+\d{1,2}\/\d{1,2}\/\d{4})",  // válido hasta: dd/mm/yyyy
+                    @"(fecha[:\s]+\d{1,2}\/\d{1,2}\/\d{4})"          // fecha: dd/mm/yyyy
+                };
+
+                var lineas = contenido.Split('\n');
+                
+                foreach (var linea in lineas)
+                {
+                    foreach (var patron in patronesFechas)
+                    {
+                        var coincidencias = Regex.Matches(linea, patron, RegexOptions.IgnoreCase);
+                        foreach (Match coincidencia in coincidencias)
+                        {
+                            var contexto = linea.Trim();
+                            if (contexto.Length > 60)
+                                contexto = contexto.Substring(0, 60) + "...";
+                            
+                            fechas.Add(contexto);
+                        }
+                    }
+                }
+
+                return fechas.Distinct().Take(10).ToList();
+            }
+            catch
+            {
+                return fechas;
+            }
+        }
+
+        private List<string> ExtraerContactos(string contenido)
+        {
+            var contactos = new List<string>();
+
+            try
+            {
+                var patronesContacto = new[]
+                {
+                    @"(\d{3}-\d{3}-\d{4})",                    // 123-456-7890
+                    @"(\(\d{3}\)\s*\d{3}-\d{4})",              // (123) 456-7890
+                    @"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", // email
+                    @"(tel[éefono]*[:\s]+[\d\s\-\(\)]+)",       // teléfono: 123-456
+                    @"(contacto[:\s]+[a-zA-Z\s]+)",             // contacto: Juan Pérez
+                    @"(email[:\s]+[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})" // email:
+                };
+
+                var lineas = contenido.Split('\n');
+                
+                foreach (var linea in lineas)
+                {
+                    foreach (var patron in patronesContacto)
+                    {
+                        var coincidencias = Regex.Matches(linea, patron, RegexOptions.IgnoreCase);
+                        foreach (Match coincidencia in coincidencias)
+                        {
+                            var contexto = linea.Trim();
+                            if (contexto.Length > 70)
+                                contexto = contexto.Substring(0, 70) + "...";
+                            
+                            contactos.Add(contexto);
+                        }
+                    }
+                }
+
+                return contactos.Distinct().Take(8).ToList();
+            }
+            catch
+            {
+                return contactos;
+            }
+        }
+
+        private List<string> ExtraerProcedimientos(string contenido)
+        {
+            var procedimientos = new List<string>();
+
+            try
+            {
+                var lineas = contenido.Split('\n');
+                
+                foreach (var linea in lineas)
+                {
+                    var lineaLimpia = linea.Trim();
+                    
+                    // Buscar líneas que parezcan pasos de procedimiento
+                    if (Regex.IsMatch(lineaLimpia, @"^(\d+\.|\d+\)|-|\•)\s+", RegexOptions.IgnoreCase) ||
+                        lineaLimpia.ToLowerInvariant().Contains("paso") ||
+                        lineaLimpia.ToLowerInvariant().StartsWith("primero") ||
+                        lineaLimpia.ToLowerInvariant().StartsWith("segundo") ||
+                        lineaLimpia.ToLowerInvariant().StartsWith("luego") ||
+                        lineaLimpia.ToLowerInvariant().StartsWith("después"))
+                    {
+                        if (lineaLimpia.Length > 10 && lineaLimpia.Length < 150)
+                        {
+                            procedimientos.Add(lineaLimpia);
+                        }
+                    }
+                }
+
+                return procedimientos.Distinct().Take(8).ToList();
+            }
+            catch
+            {
+                return procedimientos;
+            }
+        }
+
+        private List<string> ExtraerNumerosRelevantes(string contenido)
+        {
+            var numeros = new List<string>();
+
+            try
+            {
+                var patronesNumeros = new[]
+                {
+                    @"(cantidad[:\s]+\d+)",          // cantidad: 50
+                    @"(stock[:\s]+\d+)",             // stock: 25
+                    @"(disponible[:\s]+\d+)",        // disponible: 10
+                    @"(\d+\s*unidades)",             // 50 unidades
+                    @"(\d+\s*kg)",                   // 25 kg
+                    @"(\d+\s*cm)",                   // 180 cm
+                    @"(\d+\s*%)",                    // 25%
+                    @"(código[:\s]+\d+)",            // código: 12345
+                    @"(referencia[:\s]+[\w\d]+)"     // referencia: ABC123
+                };
+
+                var lineas = contenido.Split('\n');
+                
+                foreach (var linea in lineas)
+                {
+                    foreach (var patron in patronesNumeros)
+                    {
+                        var coincidencias = Regex.Matches(linea, patron, RegexOptions.IgnoreCase);
+                        foreach (Match coincidencia in coincidencias)
+                        {
+                            var contexto = linea.Trim();
+                            if (contexto.Length > 60)
+                                contexto = contexto.Substring(0, 60) + "...";
+                            
+                            numeros.Add(contexto);
+                        }
+                    }
+                }
+
+                return numeros.Distinct().Take(10).ToList();
+            }
+            catch
+            {
+                return numeros;
+            }
+        }
+
+        private List<string> GenerarSugerenciasConsultaEspecificas(string contenido, string tipoContenido)
+        {
+            var sugerencias = new List<string>();
+
+            try
+            {
+                var contenidoLower = contenido.ToLowerInvariant();
+
+                // Sugerencias basadas en contenido detectado
+                if (contenidoLower.Contains("precio") || contenidoLower.Contains("costo") || contenidoLower.Contains("$"))
+                    sugerencias.Add("¿Cuáles son los precios?");
+
+                if (contenidoLower.Contains("colchón") || contenidoLower.Contains("modelo"))
+                    sugerencias.Add("¿Qué modelos de colchones hay?");
+
+                if (contenidoLower.Contains("fecha") || Regex.IsMatch(contenidoLower, @"\d{1,2}\/\d{1,2}\/\d{4}"))
+                    sugerencias.Add("¿Cuáles son las fechas importantes?");
+
+                if (contenidoLower.Contains("contacto") || contenidoLower.Contains("teléfono") || contenidoLower.Contains("email"))
+                    sugerencias.Add("¿Cómo puedo contactar?");
+
+                if (contenidoLower.Contains("paso") || contenidoLower.Contains("procedimiento") || contenidoLower.Contains("instrucción"))
+                    sugerencias.Add("¿Cuáles son los pasos a seguir?");
+
+                if (contenidoLower.Contains("cantidad") || contenidoLower.Contains("stock") || Regex.IsMatch(contenidoLower, @"\d+\s*unidades"))
+                    sugerencias.Add("¿Qué cantidades están disponibles?");
+
+                // Sugerencias por tipo de archivo
+                switch (tipoContenido)
+                {
+                    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                        sugerencias.Add("Mostrar datos de la tabla principal");
+                        break;
+                    case "application/pdf":
+                        sugerencias.Add("Resumir las secciones importantes");
+                        break;
+                    case "text/csv":
+                        sugerencias.Add("¿Cuáles son los elementos principales?");
+                        break;
+                }
+
+                // Sugerencias generales útiles
+                if (sugerencias.Count < 3)
+                {
+                    sugerencias.AddRange(new[]
+                    {
+                        "¿Qué información clave contiene?",
+                        "Buscar datos específicos sobre...",
+                        "¿Hay números importantes que destacar?"
+                    });
+                }
+
+                return sugerencias.Take(5).ToList();
+            }
+            catch
+            {
+                return new List<string> { "¿Qué información específica necesitas?" };
+            }
+        }
+
+        #region Métodos auxiliares para extracción específica
+
+        private List<string> ExtraerModelos(string contenido)
+        {
+            var modelos = new List<string>();
+            
+            var patronesModelo = new[]
+            {
+                @"(colchón\s+[\w\s]+)",
+                @"(modelo\s+[\w\s]+)",
+                @"(serie\s+[\w\s]+)"
+            };
+
+            foreach (var patron in patronesModelo)
+            {
+                var coincidencias = Regex.Matches(contenido, patron, RegexOptions.IgnoreCase);
+                foreach (Match coincidencia in coincidencias)
+                {
+                    var modelo = coincidencia.Value.Trim();
+                    if (modelo.Length > 5 && modelo.Length < 50)
+                        modelos.Add(modelo);
+                }
+            }
+
+            return modelos.Distinct().ToList();
+        }
+
+        private string ExtraerInformacionEmpresa(string contenido)
+        {
+            var lineas = contenido.Split('\n');
+            
+            foreach (var linea in lineas)
+            {
+                if (linea.ToLowerInvariant().Contains("gomarco") && linea.Length < 100)
+                {
+                    return linea.Trim();
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private List<string> ExtraerCodigos(string contenido)
+        {
+            var codigos = new List<string>();
+            
+            var patronesCodigo = new[]
+            {
+                @"(código[:\s]+[\w\d-]+)",
+                @"(ref[:\s]+[\w\d-]+)",
+                @"(sku[:\s]+[\w\d-]+)",
+                @"([A-Z]{2,}\d{3,})"
+            };
+
+            foreach (var patron in patronesCodigo)
+            {
+                var coincidencias = Regex.Matches(contenido, patron, RegexOptions.IgnoreCase);
+                foreach (Match coincidencia in coincidencias)
+                {
+                    codigos.Add(coincidencia.Value.Trim());
+                }
+            }
+
+            return codigos.Distinct().Take(10).ToList();
+        }
+
+        private List<string> ExtraerUbicaciones(string contenido)
+        {
+            var ubicaciones = new List<string>();
+            
+            var lineas = contenido.Split('\n');
+            
+            foreach (var linea in lineas)
+            {
+                if ((linea.ToLowerInvariant().Contains("dirección") || 
+                     linea.ToLowerInvariant().Contains("ubicación") ||
+                     linea.ToLowerInvariant().Contains("calle") ||
+                     linea.ToLowerInvariant().Contains("av.") ||
+                     linea.ToLowerInvariant().Contains("avenida")) && linea.Length < 100)
+                {
+                    ubicaciones.Add(linea.Trim());
+                }
+            }
+
+            return ubicaciones.Take(5).ToList();
+        }
+
+        private List<string> ExtraerResponsables(string contenido)
+        {
+            var responsables = new List<string>();
+            
+            var patronesResponsables = new[]
+            {
+                @"(responsable[:\s]+[a-zA-Z\s]+)",
+                @"(encargado[:\s]+[a-zA-Z\s]+)",
+                @"(supervisor[:\s]+[a-zA-Z\s]+)",
+                @"(gerente[:\s]+[a-zA-Z\s]+)"
+            };
+
+            foreach (var patron in patronesResponsables)
+            {
+                var coincidencias = Regex.Matches(contenido, patron, RegexOptions.IgnoreCase);
+                foreach (Match coincidencia in coincidencias)
+                {
+                    var responsable = coincidencia.Value.Trim();
+                    if (responsable.Length > 10 && responsable.Length < 60)
+                        responsables.Add(responsable);
+                }
+            }
+
+            return responsables.Distinct().Take(5).ToList();
+        }
+
+        #endregion
+
+        #endregion
+
         #region Clases auxiliares para análisis semántico
 
         public class CaracteristicasContenido
@@ -1490,6 +2007,453 @@ namespace ChatbotGomarco.Servicios
             public string Contexto { get; set; } = string.Empty;
             public float Relevancia { get; set; }
             public int Posicion { get; set; }
+        }
+
+        public class InformacionActionable
+        {
+            public List<string> Precios { get; set; } = new();
+            public List<string> Fechas { get; set; } = new();
+            public List<string> Contactos { get; set; } = new();
+            public List<string> Procedimientos { get; set; } = new();
+            public List<string> Numeros { get; set; } = new();
+        }
+
+        public class DatosEspecificosTrabajador
+        {
+            public List<string> PreciosEncontrados { get; set; } = new();
+            public List<string> FechasEncontradas { get; set; } = new();
+            public List<string> ContactosEncontrados { get; set; } = new();
+            public List<string> NumerosEncontrados { get; set; } = new();
+            public List<string> CodigosEncontrados { get; set; } = new();
+            public List<string> ProcedimientosEncontrados { get; set; } = new();
+
+            public bool TieneInformacionEspecifica()
+            {
+                return PreciosEncontrados.Any() || FechasEncontradas.Any() || 
+                       ContactosEncontrados.Any() || NumerosEncontrados.Any() || 
+                       CodigosEncontrados.Any() || ProcedimientosEncontrados.Any();
+            }
+        }
+
+        #endregion
+
+        #region Nuevos métodos para IA avanzada
+
+        public async Task<string> ProcesarMensajeConIAAsync(string mensaje, string contextoArchivos = "", List<MensajeChat>? historialConversacion = null)
+        {
+            try
+            {
+                return await _servicioIA.GenerarRespuestaAsync(mensaje, contextoArchivos, historialConversacion);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al procesar mensaje con IA");
+                return GenerarRespuestaGeneral(mensaje);
+            }
+        }
+
+        public async Task<string> AnalizarMultiplesArchivosConIAAsync(List<ArchivoSubido> archivos, string pregunta)
+        {
+            try
+            {
+                if (!_servicioIA.EstaDisponible())
+                {
+                    return await ProcesarMultiplesArchivosAsync(archivos);
+                }
+
+                var contenidoCombinado = new StringBuilder();
+                
+                foreach (var archivo in archivos)
+                {
+                    try
+                    {
+                        var rutaTemporal = await _servicioArchivos.DescargarArchivoTemporalAsync(archivo.Id);
+                        
+                        if (_servicioExtraccion.EsTipoCompatible(archivo.TipoContenido))
+                        {
+                            var contenido = await _servicioExtraccion.ExtraerTextoAsync(rutaTemporal, archivo.TipoContenido);
+                            
+                            contenidoCombinado.AppendLine($"=== ARCHIVO: {archivo.NombreOriginal} ===");
+                            contenidoCombinado.AppendLine(contenido);
+                            contenidoCombinado.AppendLine();
+                        }
+                        
+                        // Limpiar archivo temporal
+                        if (File.Exists(rutaTemporal))
+                            File.Delete(rutaTemporal);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error al procesar archivo {Nombre}", archivo.NombreOriginal);
+                        contenidoCombinado.AppendLine($"=== ERROR AL PROCESAR: {archivo.NombreOriginal} ===");
+                    }
+                }
+
+                return await _servicioIA.AnalizarContenidoConIAAsync(contenidoCombinado.ToString(), pregunta);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al analizar múltiples archivos con IA");
+                return await ProcesarMultiplesArchivosAsync(archivos);
+            }
+        }
+
+        public void ConfigurarClaveIA(string apiKey)
+        {
+            try
+            {
+                _servicioIA.ConfigurarClave(apiKey);
+                _logger.LogInformation("Clave de IA configurada exitosamente");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al configurar clave de IA");
+            }
+        }
+
+        public bool EstaIADisponible()
+        {
+            return _servicioIA.EstaDisponible();
+        }
+
+        private async Task<string> ObtenerContextoArchivos(List<ArchivoSubido>? archivos)
+        {
+            if (archivos == null || !archivos.Any())
+                return string.Empty;
+
+            var contexto = new StringBuilder();
+            
+            foreach (var archivo in archivos.Take(5)) // Limitar a 5 archivos para no exceder límites de tokens
+            {
+                try
+                {
+                    var rutaTemporal = await _servicioArchivos.DescargarArchivoTemporalAsync(archivo.Id);
+                    
+                    if (_servicioExtraccion.EsTipoCompatible(archivo.TipoContenido))
+                    {
+                        var contenido = await _servicioExtraccion.ExtraerTextoAsync(rutaTemporal, archivo.TipoContenido);
+                        
+                        // Limitar el contenido para evitar exceder límites de tokens
+                        var contenidoLimitado = contenido.Length > 8000 
+                            ? contenido.Substring(0, 8000) + "\n\n[CONTENIDO TRUNCADO...]"
+                            : contenido;
+                        
+                        contexto.AppendLine($"=== ARCHIVO: {archivo.NombreOriginal} ===");
+                        contexto.AppendLine(contenidoLimitado);
+                        contexto.AppendLine();
+                    }
+                    
+                    // Limpiar archivo temporal
+                    if (File.Exists(rutaTemporal))
+                        File.Delete(rutaTemporal);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al obtener contexto del archivo {Nombre}", archivo.NombreOriginal);
+                }
+            }
+
+            return contexto.ToString();
+        }
+
+        #endregion
+
+        #region Métodos auxiliares orientados a trabajadores
+
+        private DatosEspecificosTrabajador AnalizarDatosEnResultados(List<ResultadoBusqueda> resultados)
+        {
+            var datos = new DatosEspecificosTrabajador();
+
+            foreach (var resultado in resultados)
+            {
+                var contexto = resultado.ContextoEncontrado;
+                
+                // Extraer precios
+                var precios = Regex.Matches(contexto, @"(\$[\d,]+\.?\d*|[\d,]+\.?\d*\s*€|precio[:\s]+[\$]?[\d,]+\.?\d*)", RegexOptions.IgnoreCase)
+                    .Cast<Match>()
+                    .Select(m => m.Value.Trim())
+                    .Where(p => !string.IsNullOrEmpty(p));
+                datos.PreciosEncontrados.AddRange(precios);
+
+                // Extraer fechas
+                var fechas = Regex.Matches(contexto, @"(\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}-\d{1,2}-\d{4})", RegexOptions.IgnoreCase)
+                    .Cast<Match>()
+                    .Select(m => m.Value.Trim());
+                datos.FechasEncontradas.AddRange(fechas);
+
+                // Extraer contactos
+                var contactos = Regex.Matches(contexto, @"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\d{3}-\d{3}-\d{4})", RegexOptions.IgnoreCase)
+                    .Cast<Match>()
+                    .Select(m => m.Value.Trim());
+                datos.ContactosEncontrados.AddRange(contactos);
+
+                // Extraer números relevantes
+                var numeros = Regex.Matches(contexto, @"(\d+\s*unidades|\d+\s*kg|\d+\s*cm|cantidad[:\s]+\d+|stock[:\s]+\d+)", RegexOptions.IgnoreCase)
+                    .Cast<Match>()
+                    .Select(m => m.Value.Trim());
+                datos.NumerosEncontrados.AddRange(numeros);
+
+                // Extraer códigos
+                var codigos = Regex.Matches(contexto, @"(código[:\s]+[\w\d-]+|ref[:\s]+[\w\d-]+|[A-Z]{2,}\d{3,})", RegexOptions.IgnoreCase)
+                    .Cast<Match>()
+                    .Select(m => m.Value.Trim());
+                datos.CodigosEncontrados.AddRange(codigos);
+            }
+
+            // Limpiar duplicados
+            datos.PreciosEncontrados = datos.PreciosEncontrados.Distinct().ToList();
+            datos.FechasEncontradas = datos.FechasEncontradas.Distinct().ToList();
+            datos.ContactosEncontrados = datos.ContactosEncontrados.Distinct().ToList();
+            datos.NumerosEncontrados = datos.NumerosEncontrados.Distinct().ToList();
+            datos.CodigosEncontrados = datos.CodigosEncontrados.Distinct().ToList();
+
+            return datos;
+        }
+
+        private string SintetizarExplicacionParaTrabajador(List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var explicacion = new StringBuilder();
+            
+            // Contextualizar la respuesta para trabajadores
+            explicacion.AppendLine("**Información relevante para tu trabajo:**");
+            explicacion.AppendLine();
+
+            foreach (var resultado in resultados.Take(2))
+            {
+                var archivo = resultado.NombreArchivo;
+                var contexto = resultado.ContextoEncontrado.Split('\n')
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .Take(3)
+                    .Select(l => l.Trim());
+
+                explicacion.AppendLine($"📄 **De: {archivo}**");
+                foreach (var linea in contexto)
+                {
+                    if (linea.Length > 5)
+                        explicacion.AppendLine($"• {linea}");
+                }
+                explicacion.AppendLine();
+            }
+
+            return explicacion.ToString();
+        }
+
+        private string GenerarResumenOrientadoTrabajador(List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var resumen = new StringBuilder();
+            
+            // Puntos clave únicos encontrados
+            var puntosUnicos = new HashSet<string>();
+            
+            foreach (var resultado in resultados.Take(3))
+            {
+                var lineas = resultado.ContextoEncontrado.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var linea in lineas.Take(2))
+                {
+                    var lineaLimpia = linea.Trim();
+                    if (lineaLimpia.Length > 15 && lineaLimpia.Length < 120 && puntosUnicos.Add(lineaLimpia))
+                    {
+                        resumen.AppendLine($"• {lineaLimpia}");
+                    }
+                }
+            }
+            
+            if (!puntosUnicos.Any())
+            {
+                resumen.AppendLine("• Información disponible en los documentos analizados");
+                resumen.AppendLine("• Para consultas más específicas, usa palabras clave exactas");
+            }
+
+            return resumen.ToString();
+        }
+
+        private string ExtraerElementosParaTrabajador(List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var elementos = new StringBuilder();
+            var listasEncontradas = new HashSet<string>();
+            
+            foreach (var resultado in resultados)
+            {
+                var lineas = resultado.ContextoEncontrado.Split('\n');
+                foreach (var linea in lineas)
+                {
+                    var lineaTrimmed = linea.Trim();
+                    
+                    // Buscar elementos de lista o numerados
+                    if ((lineaTrimmed.StartsWith("•") || lineaTrimmed.StartsWith("-") || 
+                         Regex.IsMatch(lineaTrimmed, @"^\d+\.") || 
+                         lineaTrimmed.ToLowerInvariant().Contains("modelo") ||
+                         lineaTrimmed.ToLowerInvariant().Contains("tipo") ||
+                         lineaTrimmed.ToLowerInvariant().Contains("producto")) && 
+                        listasEncontradas.Add(lineaTrimmed) && lineaTrimmed.Length > 5)
+                    {
+                        elementos.AppendLine($"• {lineaTrimmed.Replace("•", "").Replace("-", "").Trim()}");
+                    }
+                }
+            }
+            
+            if (elementos.Length == 0)
+            {
+                elementos.AppendLine("• Los documentos contienen información estructurada");
+                elementos.AppendLine("• Para ver elementos específicos, usa términos como 'lista', 'modelos', o 'productos'");
+            }
+
+            return elementos.ToString();
+        }
+
+        private string GenerarComparacionTrabajador(List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var comparacion = new StringBuilder();
+            
+            if (resultados.Count >= 2)
+            {
+                var archivo1 = resultados[0];
+                var archivo2 = resultados[1];
+
+                comparacion.AppendLine($"**📄 {archivo1.NombreArchivo}:**");
+                var lineas1 = archivo1.ContextoEncontrado.Split('\n')
+                    .Where(l => !string.IsNullOrWhiteSpace(l) && l.Length > 10)
+                    .Take(2);
+                foreach (var linea in lineas1)
+                {
+                    comparacion.AppendLine($"• {linea.Trim()}");
+                }
+                
+                comparacion.AppendLine();
+                comparacion.AppendLine($"**📄 {archivo2.NombreArchivo}:**");
+                var lineas2 = archivo2.ContextoEncontrado.Split('\n')
+                    .Where(l => !string.IsNullOrWhiteSpace(l) && l.Length > 10)
+                    .Take(2);
+                foreach (var linea in lineas2)
+                {
+                    comparacion.AppendLine($"• {linea.Trim()}");
+                }
+                
+                comparacion.AppendLine();
+                comparacion.AppendLine("*Para comparaciones más específicas, menciona qué aspectos quieres comparar (precios, características, fechas, etc.)*");
+            }
+            
+            return comparacion.ToString();
+        }
+
+        private string GenerarRespuestaBusquedaTrabajador(List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var respuesta = new StringBuilder();
+            
+            var mejorResultado = resultados.First();
+            
+            respuesta.AppendLine($"**📄 En: {mejorResultado.NombreArchivo}** (Relevancia: {mejorResultado.PorcentajeRelevancia:F1}%)");
+            respuesta.AppendLine();
+            
+            var lineasRelevantes = mejorResultado.ContextoEncontrado.Split('\n')
+                .Where(l => !string.IsNullOrWhiteSpace(l) && l.Length > 10)
+                .Take(4);
+            
+            foreach (var linea in lineasRelevantes)
+            {
+                respuesta.AppendLine($"• {linea.Trim()}");
+            }
+            
+            if (resultados.Count > 1)
+            {
+                respuesta.AppendLine();
+                respuesta.AppendLine($"**También encontré información relacionada en {resultados.Count - 1} documento(s) adicional(es).**");
+            }
+            
+            return respuesta.ToString();
+        }
+
+        private string GenerarRespuestaGeneralTrabajador(List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var respuesta = new StringBuilder();
+            
+            var mejorResultado = resultados.First();
+            
+            respuesta.AppendLine($"**📄 Fuente principal:** {mejorResultado.NombreArchivo}");
+            respuesta.AppendLine();
+            
+            var primerasLineas = mejorResultado.ContextoEncontrado.Split('\n')
+                .Where(l => !string.IsNullOrWhiteSpace(l) && l.Length > 10)
+                .Take(3);
+            
+            respuesta.AppendLine("**Información encontrada:**");
+            foreach (var linea in primerasLineas)
+            {
+                respuesta.AppendLine($"• {linea.Trim()}");
+            }
+            
+            if (resultados.Count > 1)
+            {
+                respuesta.AppendLine();
+                respuesta.AppendLine($"📋 **Información adicional disponible en {resultados.Count - 1} documento(s) más.**");
+                respuesta.AppendLine("*Pregunta por algo más específico para obtener detalles adicionales.*");
+            }
+            
+            return respuesta.ToString();
+        }
+
+        private List<string> GenerarAccionesSugeridasParaTrabajador(string mensaje, List<ResultadoBusqueda> resultados, DatosEspecificosTrabajador datos)
+        {
+            var acciones = new List<string>();
+            var mensajeLower = mensaje.ToLowerInvariant();
+
+            try
+            {
+                // Acciones basadas en datos encontrados
+                if (datos.PreciosEncontrados.Any())
+                {
+                    acciones.Add("Consultar precios actualizados con el responsable comercial");
+                    acciones.Add("Verificar si estos precios incluyen descuentos o promociones");
+                }
+
+                if (datos.FechasEncontradas.Any())
+                {
+                    acciones.Add("Revisar si las fechas mencionadas están vigentes");
+                    acciones.Add("Programar recordatorios para las fechas importantes");
+                }
+
+                if (datos.ContactosEncontrados.Any())
+                {
+                    acciones.Add("Contactar a los responsables mencionados para más detalles");
+                    acciones.Add("Guardar la información de contacto en tu agenda");
+                }
+
+                if (datos.NumerosEncontrados.Any())
+                {
+                    acciones.Add("Verificar disponibilidad de stock actual");
+                    acciones.Add("Confirmar las cantidades mencionadas");
+                }
+
+                // Acciones basadas en la intención
+                if (mensajeLower.Contains("precio"))
+                {
+                    acciones.Add("Solicitar lista de precios actualizada");
+                    acciones.Add("Consultar sobre descuentos por volumen");
+                }
+
+                if (mensajeLower.Contains("stock") || mensajeLower.Contains("disponible"))
+                {
+                    acciones.Add("Verificar inventario en tiempo real");
+                    acciones.Add("Coordinar con almacén para confirmar disponibilidad");
+                }
+
+                // Acciones generales útiles
+                if (!acciones.Any())
+                {
+                    acciones.AddRange(new[]
+                    {
+                        "Buscar información más específica en los documentos",
+                        "Consultar con el responsable del área correspondiente",
+                        "Revisar si hay documentos adicionales relacionados"
+                    });
+                }
+
+                return acciones.Take(4).ToList();
+            }
+            catch
+            {
+                return new List<string> { "Revisar la información encontrada y actuar según corresponda" };
+            }
         }
 
         #endregion

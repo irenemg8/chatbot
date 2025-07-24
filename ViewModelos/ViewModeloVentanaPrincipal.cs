@@ -49,6 +49,25 @@ namespace ChatbotGomarco.ViewModelos
         public ObservableCollection<ArchivoSubido> ArchivosSubidos { get; } = new();
         public ObservableCollection<string> SugerenciasRespuesta { get; } = new();
 
+        // Nueva propiedad para el estado de IA
+        private bool _iaDisponible;
+        public bool IADisponible
+        {
+            get => _iaDisponible;
+            set => SetProperty(ref _iaDisponible, value);
+        }
+
+        private string _estadoIA = "IA no configurada";
+        public string EstadoIA
+        {
+            get => _estadoIA;
+            set => SetProperty(ref _estadoIA, value);
+        }
+
+        // Comando para configurar IA
+        private RelayCommand? _comandoConfigurarIA;
+        public RelayCommand ComandoConfigurarIA => _comandoConfigurarIA ??= new RelayCommand(ConfigurarIA);
+
         public ViewModeloVentanaPrincipal(
             IServicioChatbot servicioChatbot,
             IServicioHistorialChats servicioHistorial,
@@ -69,6 +88,7 @@ namespace ChatbotGomarco.ViewModelos
             {
                 await CargarHistorialSesionesAsync();
                 await CrearNuevaSesionAsync();
+                ActualizarEstadoIA();
             }
             catch (Exception ex)
             {
@@ -393,6 +413,65 @@ namespace ChatbotGomarco.ViewModelos
                 sesionEnHistorial.Titulo = SesionActual.Titulo;
                 sesionEnHistorial.FechaUltimaActividad = SesionActual.FechaUltimaActividad;
             }
+        }
+
+        private void ConfigurarIA()
+        {
+            try
+            {
+                // Solicitar clave API mediante un cuadro de entrada simple
+                var resultado = Microsoft.VisualBasic.Interaction.InputBox(
+                    "Ingresa tu clave de API de OpenAI para activar la IA avanzada:\n\n" +
+                    "• La clave se mantendrá solo durante esta sesión\n" +
+                    "• Formato: sk-...\n" +
+                    "• Obtenla en: https://platform.openai.com/api-keys",
+                    "🤖 Configurar IA Avanzada",
+                    "");
+
+                if (!string.IsNullOrEmpty(resultado) && resultado.StartsWith("sk-"))
+                {
+                    _servicioChatbot.ConfigurarClaveIA(resultado);
+                    ActualizarEstadoIA();
+                    
+                    if (IADisponible)
+                    {
+                        System.Windows.MessageBox.Show(
+                            "🚀 ¡IA Avanzada activada exitosamente!\n\n" +
+                            "Tu chatbot ahora puede:\n" +
+                            "• Conversar naturalmente como ChatGPT\n" +
+                            "• Analizar documentos con IA\n" +
+                            "• Generar respuestas inteligentes\n" +
+                            "• Mantener contexto conversacional",
+                            "IA Configurada",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Information);
+                    }
+                }
+                else if (!string.IsNullOrEmpty(resultado))
+                {
+                    System.Windows.MessageBox.Show(
+                        "❌ Formato de clave inválido.\n\nLa clave debe comenzar con 'sk-'",
+                        "Error de Configuración",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al configurar IA");
+                EstadoIA = "Error al configurar IA";
+                System.Windows.MessageBox.Show(
+                    $"Error al configurar la IA: {ex.Message}",
+                    "Error",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private void ActualizarEstadoIA()
+        {
+            IADisponible = _servicioChatbot.EstaIADisponible();
+            EstadoIA = IADisponible ? "🤖 IA Avanzada ACTIVADA" : "⚠️ IA no configurada";
         }
     }
 } 

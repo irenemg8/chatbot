@@ -34,6 +34,11 @@ namespace ChatbotGomarco
             servicios.AddScoped<IServicioHistorialChats, ServicioHistorialChats>();
             servicios.AddScoped<IServicioChatbot, ServicioChatbot>();
             servicios.AddScoped<IServicioExtraccionContenido, ServicioExtraccionContenido>();
+            servicios.AddSingleton<IServicioIA, ServicioIA>();
+
+            // Servicios LLM modulares
+            servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();
+            servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IGeneradorRespuestas, ChatbotGomarco.Servicios.LLM.GeneradorRespuestas>();
 
             // ViewModels
             servicios.AddTransient<ViewModeloVentanaPrincipal>();

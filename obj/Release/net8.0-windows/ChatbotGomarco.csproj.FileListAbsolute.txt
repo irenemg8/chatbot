@@ -158,3 +158,11 @@ C:\Users\irene\Desktop\chatbot\App\runtimes\win-arm\native\e_sqlite3.dll
 C:\Users\irene\Desktop\chatbot\App\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\irene\Desktop\chatbot\App\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\irene\Desktop\chatbot\App\runtimes\win-x86\native\e_sqlite3.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Bcl.AsyncInterfaces.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Extensions.Configuration.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Extensions.Configuration.Binder.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Extensions.Diagnostics.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Extensions.Http.dll
+C:\Users\irene\Desktop\chatbot\App\Microsoft.Extensions.Options.ConfigurationExtensions.dll
+C:\Users\irene\Desktop\chatbot\App\OpenAI_API.dll
