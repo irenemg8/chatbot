@@ -33,12 +33,22 @@ namespace ChatbotGomarco
             servicios.AddScoped<IServicioArchivos, ServicioArchivos>();
             servicios.AddScoped<IServicioHistorialChats, ServicioHistorialChats>();
             servicios.AddScoped<IServicioChatbot, ServicioChatbot>();
-            servicios.AddScoped<IServicioExtraccionContenido, ServicioExtraccionContenido>();
-            servicios.AddSingleton<IServicioIA, ServicioIA>();
+            servicios.AddScoped<IServicioExtraccionContenido>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<ServicioExtraccionContenido>>();
+                var servicioIA = provider.GetService<IServicioIA>();
+                return new ServicioExtraccionContenido(logger, servicioIA);
+            });
+            servicios.AddSingleton<IServicioIA, ServicioIAClaude>();
 
             // Servicios LLM modulares
             servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();
-            servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IGeneradorRespuestas, ChatbotGomarco.Servicios.LLM.GeneradorRespuestas>();
+            servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IGeneradorRespuestas>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<ChatbotGomarco.Servicios.LLM.GeneradorRespuestas>>();
+                var servicioIA = provider.GetService<IServicioIA>();
+                return new ChatbotGomarco.Servicios.LLM.GeneradorRespuestas(logger, servicioIA);
+            });
 
             // ViewModels
             servicios.AddTransient<ViewModeloVentanaPrincipal>();

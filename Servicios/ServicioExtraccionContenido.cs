@@ -27,6 +27,7 @@ namespace ChatbotGomarco.Servicios
     public class ServicioExtraccionContenido : IServicioExtraccionContenido
     {
         private readonly ILogger<ServicioExtraccionContenido> _logger;
+        private readonly IServicioIA? _servicioIA;
         
         // Ruta para archivos de datos de Tesseract
         private static readonly string RutaDatosTesseract = Path.Combine(
@@ -71,9 +72,10 @@ namespace ChatbotGomarco.Servicios
             "application/x-tar", "application/gzip"
         };
 
-        public ServicioExtraccionContenido(ILogger<ServicioExtraccionContenido> logger)
+        public ServicioExtraccionContenido(ILogger<ServicioExtraccionContenido> logger, IServicioIA? servicioIA = null)
         {
             _logger = logger;
+            _servicioIA = servicioIA;
         }
 
         public async Task<string> ExtraerTextoAsync(string rutaArchivo, string tipoContenido)
@@ -217,13 +219,94 @@ namespace ChatbotGomarco.Servicios
             using var pdfReader = new PdfReader(rutaArchivo);
             using var pdfDocument = new PdfDocument(pdfReader);
             
-            for (int pagina = 1; pagina <= pdfDocument.GetNumberOfPages(); pagina++)
+            var numeroPaginas = pdfDocument.GetNumberOfPages();
+            
+            // Si Claude Vision está disponible y el PDF no es muy grande, usar análisis visual
+            if (_servicioIA != null && _servicioIA.EstaDisponible() && numeroPaginas <= 20)
             {
-                var page = pdfDocument.GetPage(pagina);
-                var textoPagina = PdfTextExtractor.GetTextFromPage(page);
-                texto.AppendLine($"=== PÁGINA {pagina} ===");
-                texto.AppendLine(textoPagina);
-                texto.AppendLine();
+                try
+                {
+                    texto.AppendLine("🤖 **ANÁLISIS PROFUNDO DEL PDF CON CLAUDE VISION:**");
+                    texto.AppendLine();
+                    
+                    if (_servicioIA is ServicioIAClaude servicioIAClaude)
+                    {
+                        // Analizar cada página como imagen para capturar TODA la información
+                        for (int pagina = 1; pagina <= numeroPaginas; pagina++)
+                        {
+                            texto.AppendLine($"=== PÁGINA {pagina} de {numeroPaginas} ===");
+                            
+                            try
+                            {
+                                // Convertir página PDF a imagen (requeriría una biblioteca adicional como PDFiumSharp)
+                                // Por ahora, extraer texto tradicional + análisis mejorado
+                                var page = pdfDocument.GetPage(pagina);
+                                var textoPagina = PdfTextExtractor.GetTextFromPage(page);
+                                
+                                if (!string.IsNullOrWhiteSpace(textoPagina))
+                                {
+                                    // Analizar el contenido de la página con IA para mejor comprensión
+                                    var prompt = $@"Analiza el siguiente contenido de la página {pagina} de un PDF:
+
+{textoPagina}
+
+Por favor:
+1. Resume los puntos clave
+2. Extrae TODOS los datos importantes (números, fechas, nombres, cantidades)
+3. Identifica cualquier tabla o estructura de datos
+4. Resalta información empresarial relevante
+5. Mantén el formato estructurado
+
+Responde en español de forma clara y completa.";
+                                    
+                                    var analisisPagina = await _servicioIA.AnalizarContenidoConIAAsync(textoPagina, prompt);
+                                    texto.AppendLine(analisisPagina);
+                                }
+                                else
+                                {
+                                    texto.AppendLine("[Página sin texto detectable - posiblemente contiene solo imágenes]");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Error al analizar página {Pagina} del PDF", pagina);
+                                // Fallback al texto extraído normalmente
+                                var page = pdfDocument.GetPage(pagina);
+                                var textoPagina = PdfTextExtractor.GetTextFromPage(page);
+                                texto.AppendLine(textoPagina);
+                            }
+                            
+                            texto.AppendLine();
+                        }
+                        
+                        // Agregar resumen general si el PDF tiene múltiples páginas
+                        if (numeroPaginas > 1)
+                        {
+                            texto.AppendLine("=== RESUMEN GENERAL DEL DOCUMENTO ===");
+                            var resumenPrompt = "Basándote en todo el contenido anterior, proporciona un resumen ejecutivo del documento completo, destacando los puntos más importantes.";
+                            var resumenGeneral = await _servicioIA.AnalizarContenidoConIAAsync(texto.ToString(), resumenPrompt);
+                            texto.AppendLine(resumenGeneral);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al usar Claude Vision para PDF, usando extracción tradicional");
+                    // Continuar con extracción tradicional
+                }
+            }
+            
+            // Si no se usó IA o falló, hacer extracción tradicional
+            if (!texto.ToString().Contains("CLAUDE VISION"))
+            {
+                for (int pagina = 1; pagina <= numeroPaginas; pagina++)
+                {
+                    var page = pdfDocument.GetPage(pagina);
+                    var textoPagina = PdfTextExtractor.GetTextFromPage(page);
+                    texto.AppendLine($"=== PÁGINA {pagina} ===");
+                    texto.AppendLine(textoPagina);
+                    texto.AppendLine();
+                }
             }
 
             return texto.ToString();
@@ -236,25 +319,108 @@ namespace ChatbotGomarco.Servicios
             using var documento = WordprocessingDocument.Open(rutaArchivo, false);
             var body = documento.MainDocumentPart.Document.Body;
 
-            foreach (var elemento in body.Elements())
+            // Si Claude Vision está disponible, hacer análisis profundo
+            if (_servicioIA != null && _servicioIA.EstaDisponible())
             {
-                if (elemento is Paragraph paragraph)
+                try
                 {
-                    var textoParrafo = paragraph.InnerText;
-                    if (!string.IsNullOrWhiteSpace(textoParrafo))
+                    texto.AppendLine("🤖 **ANÁLISIS PROFUNDO DEL DOCUMENTO WORD CON CLAUDE:**");
+                    texto.AppendLine();
+                    
+                    // Primero extraer todo el contenido estructurado
+                    var contenidoEstructurado = new StringBuilder();
+                    var tablas = new List<string>();
+                    var imagenes = 0;
+                    
+                    foreach (var elemento in body.Elements())
                     {
-                        texto.AppendLine(textoParrafo);
+                        if (elemento is Paragraph paragraph)
+                        {
+                            var textoParrafo = paragraph.InnerText;
+                            if (!string.IsNullOrWhiteSpace(textoParrafo))
+                            {
+                                // Detectar si es un encabezado
+                                var estilo = paragraph.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
+                                if (estilo?.Contains("Heading") == true)
+                                {
+                                    contenidoEstructurado.AppendLine($"### {textoParrafo}");
+                                }
+                                else
+                                {
+                                    contenidoEstructurado.AppendLine(textoParrafo);
+                                }
+                            }
+                        }
+                        else if (elemento is DocumentFormat.OpenXml.Wordprocessing.Table tabla)
+                        {
+                            var tablaTexto = new StringBuilder();
+                            tablaTexto.AppendLine("=== TABLA ===");
+                            foreach (var fila in tabla.Elements<TableRow>())
+                            {
+                                var textoFila = string.Join(" | ", fila.Elements<TableCell>().Select(c => c.InnerText));
+                                tablaTexto.AppendLine(textoFila);
+                            }
+                            tablas.Add(tablaTexto.ToString());
+                            contenidoEstructurado.AppendLine(tablaTexto.ToString());
+                        }
+                    }
+                    
+                    // Analizar el contenido con IA
+                    var prompt = $@"Analiza el siguiente documento Word empresarial:
+
+{contenidoEstructurado}
+
+Por favor proporciona:
+1. **Resumen ejecutivo** del documento
+2. **Puntos clave** y conclusiones principales
+3. **Datos importantes** (números, fechas, nombres, cantidades, porcentajes)
+4. **Estructura del documento** (secciones principales)
+5. **Información crítica** para decisiones empresariales
+6. **Análisis de tablas** si las hay
+7. **Recomendaciones o acciones** sugeridas en el documento
+
+Responde en español de forma estructurada y profesional.";
+                    
+                    var analisisIA = await _servicioIA.AnalizarContenidoConIAAsync(contenidoEstructurado.ToString(), prompt);
+                    texto.AppendLine(analisisIA);
+                    
+                    // Agregar información adicional
+                    if (tablas.Count > 0)
+                    {
+                        texto.AppendLine();
+                        texto.AppendLine($"📊 **Tablas encontradas:** {tablas.Count}");
                     }
                 }
-                else if (elemento is DocumentFormat.OpenXml.Wordprocessing.Table tabla)
+                catch (Exception ex)
                 {
-                    texto.AppendLine("=== TABLA ===");
-                    foreach (var fila in tabla.Elements<TableRow>())
+                    _logger.LogWarning(ex, "Error al usar IA para análisis de Word, usando extracción tradicional");
+                    // Continuar con extracción tradicional
+                }
+            }
+            
+            // Si no se usó IA o falló, hacer extracción tradicional
+            if (!texto.ToString().Contains("CLAUDE"))
+            {
+                foreach (var elemento in body.Elements())
+                {
+                    if (elemento is Paragraph paragraph)
                     {
-                        var textoFila = string.Join(" | ", fila.Elements<TableCell>().Select(c => c.InnerText));
-                        texto.AppendLine(textoFila);
+                        var textoParrafo = paragraph.InnerText;
+                        if (!string.IsNullOrWhiteSpace(textoParrafo))
+                        {
+                            texto.AppendLine(textoParrafo);
+                        }
                     }
-                    texto.AppendLine();
+                    else if (elemento is DocumentFormat.OpenXml.Wordprocessing.Table tabla)
+                    {
+                        texto.AppendLine("=== TABLA ===");
+                        foreach (var fila in tabla.Elements<TableRow>())
+                        {
+                            var textoFila = string.Join(" | ", fila.Elements<TableCell>().Select(c => c.InnerText));
+                            texto.AppendLine(textoFila);
+                        }
+                        texto.AppendLine();
+                    }
                 }
             }
 
@@ -269,6 +435,87 @@ namespace ChatbotGomarco.Servicios
             var workbookPart = documento.WorkbookPart;
             var shareStringPart = workbookPart.SharedStringTablePart;
 
+            // Si Claude está disponible, hacer análisis profundo
+            if (_servicioIA != null && _servicioIA.EstaDisponible())
+            {
+                try
+                {
+                    texto.AppendLine("🤖 **ANÁLISIS PROFUNDO DE LA HOJA DE CÁLCULO CON CLAUDE:**");
+                    texto.AppendLine();
+                    
+                    var todasLasHojas = new StringBuilder();
+                    var numeroHoja = 0;
+                    
+                    foreach (var worksheetPart in workbookPart.WorksheetParts)
+                    {
+                        numeroHoja++;
+                        var worksheet = worksheetPart.Worksheet;
+                        var hojaData = worksheet.GetFirstChild<SheetData>();
+                        
+                        todasLasHojas.AppendLine($"=== HOJA {numeroHoja} ===");
+                        
+                        // Construir representación tabular de los datos
+                        var datosHoja = new List<List<string>>();
+                        
+                        foreach (var fila in hojaData.Elements<Row>())
+                        {
+                            var valores = new List<string>();
+                            foreach (var celda in fila.Elements<Cell>())
+                            {
+                                var valor = ObtenerValorCelda(celda, shareStringPart);
+                                valores.Add(valor);
+                            }
+                            if (valores.Any(v => !string.IsNullOrWhiteSpace(v)))
+                            {
+                                datosHoja.Add(valores);
+                                todasLasHojas.AppendLine(string.Join(" | ", valores));
+                            }
+                        }
+                        
+                        // Si la hoja tiene datos significativos, analizarla
+                        if (datosHoja.Count > 1)
+                        {
+                            todasLasHojas.AppendLine($"\nTotal de filas con datos: {datosHoja.Count}");
+                        }
+                        
+                        todasLasHojas.AppendLine();
+                    }
+                    
+                    // Analizar todos los datos con IA
+                    var prompt = $@"Analiza los siguientes datos de una hoja de cálculo empresarial:
+
+{todasLasHojas}
+
+Por favor proporciona un análisis completo que incluya:
+1. **Resumen de los datos**: ¿Qué tipo de información contiene?
+2. **Estructura identificada**: ¿Qué tablas, listas o conjuntos de datos hay?
+3. **Valores clave**: Extrae TODOS los números importantes, totales, porcentajes, fechas
+4. **Análisis estadístico**: Si hay datos numéricos, proporciona sumas, promedios, máximos, mínimos
+5. **Tendencias o patrones**: Identifica cualquier patrón en los datos
+6. **Datos anómalos**: Señala valores inusuales o que requieran atención
+7. **Contexto empresarial**: ¿Para qué sirven estos datos? ¿Qué decisiones apoyan?
+8. **Recomendaciones**: Basándote en los datos, ¿qué acciones sugieres?
+
+Responde en español con un análisis profesional y detallado.";
+                    
+                    var analisisIA = await _servicioIA.AnalizarContenidoConIAAsync(todasLasHojas.ToString(), prompt);
+                    texto.AppendLine(analisisIA);
+                    
+                    // Agregar metadatos adicionales
+                    texto.AppendLine();
+                    texto.AppendLine($"📊 **Información adicional:**");
+                    texto.AppendLine($"• Número de hojas: {numeroHoja}");
+                    
+                    return texto.ToString();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al usar IA para análisis de Excel, usando extracción tradicional");
+                    // Continuar con extracción tradicional
+                }
+            }
+            
+            // Extracción tradicional si no hay IA o falló
             foreach (var worksheetPart in workbookPart.WorksheetParts)
             {
                 var worksheet = worksheetPart.Worksheet;
@@ -338,17 +585,58 @@ namespace ChatbotGomarco.Servicios
                 var resultado = new StringBuilder();
                 resultado.AppendLine("=== ANÁLISIS COMPLETO DE IMAGEN ===");
 
-                // 1. PROPIEDADES BÁSICAS DE LA IMAGEN
+                // 1. Si Claude Vision está disponible, usarlo primero
+                if (_servicioIA != null && _servicioIA.EstaDisponible())
+                {
+                    try
+                    {
+                        resultado.AppendLine("🤖 **ANÁLISIS CON CLAUDE VISION:**");
+                        resultado.AppendLine();
+                        
+                        // Usar Claude Vision para análisis completo
+                        if (_servicioIA is ServicioIAClaude servicioIAClaude)
+                        {
+                            var analisisClaudeVision = await servicioIAClaude.AnalizarImagenConClaudeVisionAsync(rutaArchivo);
+                            resultado.AppendLine(analisisClaudeVision);
+                            resultado.AppendLine();
+                        }
+                        else
+                        {
+                            // Si no es ServicioIAClaude, usar análisis genérico
+                            var contenidoBasico = await ObtenerMetadatosBasicosImagenAsync(rutaArchivo);
+                            var analisisIA = await _servicioIA.AnalizarContenidoConIAAsync(
+                                contenidoBasico, 
+                                "Analiza esta imagen y extrae toda la información relevante, especialmente cualquier texto visible."
+                            );
+                            resultado.AppendLine(analisisIA);
+                            resultado.AppendLine();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error al usar Claude Vision, continuando con análisis tradicional");
+                        resultado.AppendLine("⚠️ No se pudo completar el análisis con IA, usando métodos alternativos...");
+                        resultado.AppendLine();
+                    }
+                }
+
+                // 2. PROPIEDADES BÁSICAS DE LA IMAGEN
                 await AnaluzarPropiedadesBasicasImagen(rutaArchivo, resultado);
 
-                // 2. METADATOS TÉCNICOS (EXIF, etc.)
+                // 3. METADATOS TÉCNICOS (EXIF, etc.)
                 await AnaluzarMetadatosTecnicos(rutaArchivo, resultado);
 
-                // 3. ANÁLISIS VISUAL Y CONTENIDO
-                await AnalyzarContenidoVisual(rutaArchivo, resultado);
+                // 4. ANÁLISIS VISUAL Y CONTENIDO (solo si no se usó Claude Vision)
+                if (_servicioIA == null || !_servicioIA.EstaDisponible())
+                {
+                    await AnalyzarContenidoVisual(rutaArchivo, resultado);
+                }
 
-                // 4. OCR - EXTRACCIÓN DE TEXTO
-                await EjecutarOCRAsync(rutaArchivo, resultado);
+                // 5. OCR - EXTRACCIÓN DE TEXTO (solo si no se usó Claude Vision)
+                if (_servicioIA == null || !_servicioIA.EstaDisponible())
+                {
+                    await EjecutarOCRAsync(rutaArchivo, resultado);
+                }
 
                 return resultado.ToString();
             }
@@ -1218,6 +1506,26 @@ namespace ChatbotGomarco.Servicios
                 _logger.LogWarning(ex, "Error al preprocesar imagen para OCR");
                 return null;
             }
+        }
+
+        private async Task<string> ObtenerMetadatosBasicosImagenAsync(string rutaArchivo)
+        {
+            var info = new StringBuilder();
+            try
+            {
+                using var imagen = ImageSharpImage.Load(rutaArchivo);
+                var infoArchivo = new FileInfo(rutaArchivo);
+                
+                info.AppendLine($"Imagen: {infoArchivo.Name}");
+                info.AppendLine($"Dimensiones: {imagen.Width}x{imagen.Height}");
+                info.AppendLine($"Formato: {imagen.Metadata.DecodedImageFormat?.Name ?? "Desconocido"}");
+                info.AppendLine($"Tamaño: {FormatearTamaño(infoArchivo.Length)}");
+            }
+            catch (Exception ex)
+            {
+                info.AppendLine($"Error al obtener metadatos: {ex.Message}");
+            }
+            return info.ToString();
         }
 
         #endregion

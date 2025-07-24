@@ -12,14 +12,31 @@ namespace ChatbotGomarco.Servicios.LLM
     public class GeneradorRespuestas : IGeneradorRespuestas
     {
         private readonly ILogger<GeneradorRespuestas> _logger;
+        private readonly IServicioIA? _servicioIA;
 
-        public GeneradorRespuestas(ILogger<GeneradorRespuestas> logger)
+        public GeneradorRespuestas(ILogger<GeneradorRespuestas> logger, IServicioIA? servicioIA = null)
         {
             _logger = logger;
+            _servicioIA = servicioIA;
         }
 
         public async Task<string> GenerarRespuestaAnalisisDocumento(string pregunta, string contextoArchivos, string contextoCompleto)
         {
+            // Si la IA está disponible, usarla directamente
+            if (_servicioIA != null && _servicioIA.EstaDisponible())
+            {
+                try
+                {
+                    return await _servicioIA.AnalizarContenidoConIAAsync(contextoArchivos, pregunta);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al usar IA para análisis de documento");
+                    // Continuar con fallback
+                }
+            }
+
+            // Fallback: simulación original
             await Task.Delay(Random.Shared.Next(800, 1500));
             
             var respuesta = new StringBuilder();
@@ -55,6 +72,21 @@ namespace ChatbotGomarco.Servicios.LLM
 
         public async Task<string> GenerarConversacionProfunda(string mensaje, string contexto, List<MensajeChat>? historial)
         {
+            // Si la IA está disponible, usarla directamente
+            if (_servicioIA != null && _servicioIA.EstaDisponible())
+            {
+                try
+                {
+                    return await _servicioIA.GenerarRespuestaAsync(mensaje, contexto, historial);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al usar IA para conversación profunda");
+                    // Continuar con fallback
+                }
+            }
+
+            // Fallback: simulación original
             await Task.Delay(Random.Shared.Next(600, 1200));
             
             var respuesta = new StringBuilder();

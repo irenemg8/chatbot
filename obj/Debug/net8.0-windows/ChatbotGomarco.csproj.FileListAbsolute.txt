@@ -1,0 +1,8 @@
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco.csproj.AssemblyReference.cache
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaConfiguracionIA.baml
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaConfiguracionIA.g.cs
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaPrincipal.g.cs
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\App.g.cs
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco_MarkupCompile.cache
+C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco_MarkupCompile.lref

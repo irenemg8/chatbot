@@ -114,6 +114,32 @@ dotnet build
 dotnet run
 ```
 
+## 🤖 Configuración de Claude 4 API (NUEVO)
+
+### Activar Análisis Avanzado con IA
+
+El chatbot ahora incluye integración con **Claude 4 Sonnet** para análisis profundo de documentos e imágenes:
+
+1. **Obtener API Key de Anthropic**:
+   - Registrarse en: https://console.anthropic.com
+   - Crear una nueva API Key
+   - Copiar la clave (formato: `sk-ant-...`)
+
+2. **Configurar en el Chatbot**:
+   - Abrir el Chatbot GOMARCO
+   - Hacer clic en el botón "⚙️ Configurar IA"
+   - Pegar la API Key de Anthropic
+   - La configuración se aplica inmediatamente
+
+3. **Características con Claude 4**:
+   - ✨ **Análisis Visual**: Comprensión completa de imágenes con Claude Vision
+   - 📄 **PDFs Inteligentes**: Análisis página por página con resúmenes ejecutivos
+   - 📊 **Excel/Word**: Identificación de patrones, tendencias y análisis estadístico
+   - 💬 **Conversaciones Naturales**: Respuestas contextuales y precisas
+   - 🔍 **Extracción Profunda**: No solo texto, sino comprensión del contenido
+
+**Nota**: La API Key se mantiene solo durante la sesión actual por seguridad. Deberá ingresarla nuevamente al reiniciar la aplicación.
+
 ## 📞 Soporte
 
 Si continúa teniendo problemas:

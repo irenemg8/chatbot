@@ -77,6 +77,123 @@ echo Instalacion completada exitosamente
 exit /b 0
 ```
 
+## 🤖 Configuración de Claude 4 API para Despliegue Empresarial
+
+### Gestión Centralizada de API Keys
+
+Para despliegues empresariales, se recomienda:
+
+1. **Variable de Entorno (Recomendado)**
+```batch
+:: Configurar via GPO o script de despliegue
+setx CLAUDE_API_KEY "sk-ant-api03-..." /M
+```
+
+2. **Archivo de Configuración Compartido**
+```powershell
+# Crear archivo de configuración en red compartida
+$config = @{
+    ApiKey = "sk-ant-api03-..."
+    Model = "claude-sonnet-4-20250514"
+    MaxTokens = 4096
+}
+$config | ConvertTo-Json | Out-File "\\servidor\configs\chatbot-claude.json"
+```
+
+3. **Configuración via Registry**
+```batch
+:: Establecer clave en registro (cifrada)
+reg add "HKLM\SOFTWARE\GOMARCO\ChatbotGomarco" /v "ClaudeApiKey" /t REG_SZ /d "ENCRYPTED_KEY_HERE" /f
+```
+
+### Script de Configuración Automatizada
+
+```powershell
+# ConfigurarClaudeAPI.ps1
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$ApiKey,
+    
+    [string]$TargetComputers = "localhost"
+)
+
+# Función para configurar Claude API en equipos remotos
+function Set-ClaudeAPIKey {
+    param(
+        [string]$ComputerName,
+        [string]$ApiKey
+    )
+    
+    Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+        param($key)
+        
+        # Crear variable de entorno del sistema
+        [Environment]::SetEnvironmentVariable("CLAUDE_API_KEY", $key, "Machine")
+        
+        # Opcional: Guardar en registro cifrado
+        $encrypted = ConvertTo-SecureString $key -AsPlainText -Force | ConvertFrom-SecureString
+        New-ItemProperty -Path "HKLM:\SOFTWARE\GOMARCO\ChatbotGomarco" -Name "ClaudeApiKey" -Value $encrypted -Force
+        
+    } -ArgumentList $ApiKey
+}
+
+# Aplicar a todos los equipos
+$computers = $TargetComputers -split ','
+foreach ($computer in $computers) {
+    Write-Host "Configurando Claude API en $computer..." -ForegroundColor Yellow
+    Set-ClaudeAPIKey -ComputerName $computer -ApiKey $ApiKey
+}
+```
+
+### Límites y Cuotas Empresariales
+
+Para controlar el uso de la API:
+
+```json
+{
+  "claude_config": {
+    "api_key": "sk-ant-api03-...",
+    "model": "claude-sonnet-4-20250514",
+    "limits": {
+      "max_requests_per_hour": 1000,
+      "max_tokens_per_request": 4096,
+      "max_cost_per_month": 500.00
+    },
+    "features": {
+      "vision_enabled": true,
+      "document_analysis": true,
+      "excel_analysis": true,
+      "pdf_deep_analysis": true
+    }
+  }
+}
+```
+
+### Monitoreo de Uso
+
+```powershell
+# MonitorearUsoClaude.ps1
+# Script para monitorear el uso de Claude API en la organización
+
+$logPath = "\\servidor\logs\claude-usage"
+$date = Get-Date -Format "yyyy-MM-dd"
+
+# Recopilar métricas de uso
+$metrics = @{
+    Date = $date
+    TotalRequests = 0
+    TotalTokens = 0
+    EstimatedCost = 0.0
+    TopUsers = @()
+}
+
+# Análisis de logs...
+# [Código de análisis aquí]
+
+# Generar reporte
+$metrics | ConvertTo-Json | Out-File "$logPath\usage-$date.json"
+```
+
 ### Script de Verificación PowerShell
 
 ```powershell

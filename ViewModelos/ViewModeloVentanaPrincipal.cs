@@ -421,14 +421,13 @@ namespace ChatbotGomarco.ViewModelos
             {
                 // Solicitar clave API mediante un cuadro de entrada simple
                 var resultado = Microsoft.VisualBasic.Interaction.InputBox(
-                    "Ingresa tu clave de API de OpenAI para activar la IA avanzada:\n\n" +
+                    "Ingresa tu clave de API de Anthropic Claude para activar la IA avanzada:\n\n" +
                     "• La clave se mantendrá solo durante esta sesión\n" +
-                    "• Formato: sk-...\n" +
-                    "• Obtenla en: https://platform.openai.com/api-keys",
-                    "🤖 Configurar IA Avanzada",
+                    "• Obtenla en: https://console.anthropic.com/api-keys",
+                    "🤖 Configurar Claude IA Avanzada",
                     "");
 
-                if (!string.IsNullOrEmpty(resultado) && resultado.StartsWith("sk-"))
+                if (!string.IsNullOrEmpty(resultado))
                 {
                     _servicioChatbot.ConfigurarClaveIA(resultado);
                     ActualizarEstadoIA();
@@ -436,24 +435,24 @@ namespace ChatbotGomarco.ViewModelos
                     if (IADisponible)
                     {
                         System.Windows.MessageBox.Show(
-                            "🚀 ¡IA Avanzada activada exitosamente!\n\n" +
+                            "🚀 ¡Claude IA Avanzada activada exitosamente!\n\n" +
                             "Tu chatbot ahora puede:\n" +
-                            "• Conversar naturalmente como ChatGPT\n" +
-                            "• Analizar documentos con IA\n" +
-                            "• Generar respuestas inteligentes\n" +
-                            "• Mantener contexto conversacional",
-                            "IA Configurada",
+                            "• Conversar naturalmente con la potencia de Claude\n" +
+                            "• Analizar documentos e imágenes con IA avanzada\n" +
+                            "• Generar respuestas inteligentes y contextuales\n" +
+                            "• Mantener conversaciones profundas y complejas",
+                            "Claude IA Configurada",
                             System.Windows.MessageBoxButton.OK,
                             System.Windows.MessageBoxImage.Information);
                     }
-                }
-                else if (!string.IsNullOrEmpty(resultado))
-                {
-                    System.Windows.MessageBox.Show(
-                        "❌ Formato de clave inválido.\n\nLa clave debe comenzar con 'sk-'",
-                        "Error de Configuración",
-                        System.Windows.MessageBoxButton.OK,
-                        System.Windows.MessageBoxImage.Warning);
+                    else
+                    {
+                        System.Windows.MessageBox.Show(
+                            "❌ No se pudo configurar la IA.\n\nPor favor verifica que la clave API sea válida.",
+                            "Error de Configuración",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Warning);
+                    }
                 }
             }
             catch (Exception ex)

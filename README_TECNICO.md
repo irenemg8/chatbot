@@ -1099,3 +1099,110 @@ Write-Host "`n=== FIN DIAGNÓSTICO ===" -ForegroundColor Green
   
   **Sistema 100% Seguro • 100% Local • 100% Privado**
 </div> 
+
+## Arquitectura del Sistema
+
+### Componentes Principales
+
+1. **Interfaz de Usuario (WPF)**
+   - `VentanaPrincipal.xaml`: Ventana principal con interfaz moderna usando Material Design
+   - `ViewModeloVentanaPrincipal.cs`: ViewModel que maneja la lógica de presentación
+
+2. **Servicios Core**
+   - `ServicioChatbot`: Orquesta toda la lógica de conversación y análisis
+   - `ServicioArchivos`: Gestiona el almacenamiento y recuperación de archivos
+   - `ServicioHistorialChats`: Maneja el historial de conversaciones
+   - `ServicioCifrado`: Proporciona encriptación AES para datos sensibles
+   - `ServicioExtraccionContenido`: Extrae texto y metadatos de documentos
+   - `ServicioIAClaude`: **NUEVO** - Integración con Claude 4 API para análisis avanzado
+
+3. **Modelos de Datos**
+   - `MensajeChat`: Representa un mensaje en la conversación
+   - `ArchivoSubido`: Información sobre archivos cargados
+   - `SesionChat`: Sesión de conversación con metadatos
+
+4. **Base de Datos**
+   - SQLite con Entity Framework Core
+   - Esquema con tablas para sesiones, mensajes y archivos
+
+## Integración con Claude 4 API
+
+### Características Principales
+
+El chatbot ahora utiliza **Claude 4 Sonnet** (claude-sonnet-4-20250514), el modelo más reciente y potente de Anthropic, que ofrece:
+
+1. **Análisis Profundo de Imágenes con Claude Vision**
+   - Análisis exhaustivo del contenido interno de imágenes
+   - Extracción precisa de texto visible (OCR mejorado)
+   - Identificación de tablas, gráficos y datos estructurados
+   - Análisis contextual empresarial
+
+2. **Análisis Mejorado de Documentos**
+   - **PDFs**: Análisis página por página con resúmenes ejecutivos
+   - **Word**: Extracción estructurada con identificación de secciones y tablas
+   - **Excel**: Análisis estadístico completo de datos con identificación de tendencias
+
+3. **Configuración de la IA**
+   - Integración mediante el paquete NuGet `Anthropic.SDK`
+   - Configuración de API Key mediante entrada segura del usuario
+   - Temperatura ajustada para análisis precisos (0.3 para imágenes, 0.7 general)
+
+### Implementación Técnica
+
+```csharp
+// Servicio de IA con Claude 4
+public class ServicioIAClaude : IServicioIA
+{
+    private const string MODELO_CLAUDE = "claude-sonnet-4-20250514";
+    private const int MAX_TOKENS = 4096;
+    
+    // Análisis de imágenes con Claude Vision
+    public async Task<string> AnalizarImagenConClaudeVisionAsync(string rutaImagen, string pregunta = "")
+    {
+        // Conversión a base64 y análisis profundo
+        // Extracción completa de contenido interno
+    }
+}
+```
+
+### Mejoras en el Análisis de Contenido
+
+1. **Extracción de Contenido Mejorada**
+   - PDFs: Análisis con IA de cada página para mejor comprensión
+   - Documentos Office: Identificación de estructura y datos clave
+   - Imágenes: Análisis completo con Claude Vision antes del OCR tradicional
+
+2. **Prompts Especializados**
+   - Prompts específicos para cada tipo de documento
+   - Énfasis en la extracción de TODOS los datos internos
+   - Análisis contextual empresarial
+
+## Dependencias Actualizadas 
+
+### Paquetes NuGet Principales
+
+```xml
+<!-- Framework UI -->
+<PackageReference Include="MaterialDesignThemes" Version="5.0.0" />
+<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+
+<!-- IA y Procesamiento de Lenguaje Natural -->
+<PackageReference Include="Anthropic.SDK" Version="5.4.3" />  <!-- Claude 4 API -->
+<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+
+<!-- Base de Datos -->
+<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.3" />
+
+<!-- Procesamiento de Documentos -->
+<PackageReference Include="itext7" Version="8.0.3" />
+<PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
+<PackageReference Include="Tesseract" Version="5.2.0" />
+
+<!-- Procesamiento de Imágenes -->
+<PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+<PackageReference Include="MetadataExtractor" Version="2.8.1" />
+
+<!-- Utilidades -->
+<PackageReference Include="SharpCompress" Version="0.36.0" />
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+``` 
