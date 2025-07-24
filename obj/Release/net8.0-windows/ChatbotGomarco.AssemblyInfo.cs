@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyCopyrightAttribute("Copyright © GOMARCO 2025")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+191999dc2ab8dede418fcf6624906444be00a12b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+55e2b58dd79ffe4d0cb3beb04e203883f1c24312")]
 [assembly: System.Reflection.AssemblyProductAttribute("ChatbotGomarco")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Chatbot GOMARCO")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
