@@ -34,7 +34,8 @@ namespace ChatbotGomarco
             servicios.AddScoped<IServicioHistorialChats, ServicioHistorialChats>();
             servicios.AddScoped<IServicioChatbot, ServicioChatbot>();
             servicios.AddScoped<IServicioExtraccionContenido, ServicioExtraccionContenido>();
-            servicios.AddSingleton<IServicioIA, ServicioIA>();
+            // Usar el nuevo ServicioOpenAI con IA real en lugar del simulado
+            servicios.AddSingleton<IServicioIA, ServicioOpenAI>();
 
             // Servicios LLM modulares
             servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();
