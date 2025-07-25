@@ -1,0 +1,63 @@
+DOCUMENTO DE PRUEBA EMPRESARIAL - ANÁLISIS IA
+=============================================
+
+**EMPRESA:** GOMARCO S.A.
+**FECHA:** 25 de Julio de 2025
+**DEPARTAMENTO:** Ventas y Marketing
+**TIPO:** Informe de Rendimiento Trimestral
+
+**RESUMEN EJECUTIVO:**
+Durante Q2 2025, GOMARCO experimentó un crecimiento del 23.5% en ventas de colchones premium.
+
+**DATOS FINANCIEROS:**
+- Ingresos Totales: €2,458,750
+- Margen de Beneficio: 34.2%
+- Unidades Vendidas: 1,247 colchones
+- Precio Promedio: €1,970 por unidad
+
+**PRODUCTOS MÁS VENDIDOS:**
+1. Colchón GOMARCO Elite (€2,450) - 342 unidades
+2. Colchón GOMARCO Comfort (€1,850) - 498 unidades  
+3. Colchón GOMARCO Essential (€1,200) - 407 unidades
+
+**DATOS DE CLIENTES:**
+- Cliente Principal: Hotel Luxury Chains (pedido €89,450)
+- Región con mayor crecimiento: Cataluña (+45%)
+- Satisfacción del cliente: 94.8%
+
+**PERSONAL CLAVE:**
+- Director Comercial: Miguel Rodríguez (ext. 2401)
+- Gerente de Ventas: Ana García (ext. 2389)
+- Especialista Producto: Carlos Fernández (ext. 2456)
+
+**FECHAS IMPORTANTES:**
+- Lanzamiento nuevo producto: 15 de Septiembre 2025
+- Reunión accionistas: 30 de Agosto 2025
+- Cierre fiscal: 31 de Diciembre 2025
+
+**MÉTRICAS DE RENDIMIENTO:**
+- Tiempo medio de entrega: 5.2 días
+- Devoluciones: 0.8% (muy bajo)
+- NPS Score: 87 puntos
+- Conversión web: 12.4%
+
+**RECOMENDACIONES ESTRATÉGICAS:**
+1. Aumentar inversión en marketing digital
+2. Expandir línea de productos ecológicos
+3. Optimizar cadena de suministro
+4. Implementar programa de fidelización B2B
+
+**CONTACTO:**
+📧 Email: ventas@gomarco.com
+📞 Teléfono: +34 91 234 5678
+🌐 Web: www.gomarco.com
+📍 Dirección: Calle Industrial 45, 28080 Madrid
+
+**CÓDIGOS INTERNOS:**
+- Código Proyecto: GOM-2025-Q2-REP
+- ID Documento: DOC-789456123
+- Versión: v2.1.3
+
+---
+Este documento contiene información empresarial confidencial.
+Último acceso: 25/07/2025 18:00 CET 

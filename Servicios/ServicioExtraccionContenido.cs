@@ -229,7 +229,7 @@ namespace ChatbotGomarco.Servicios
                     texto.AppendLine("🤖 **ANÁLISIS PROFUNDO DEL PDF CON CLAUDE VISION:**");
                     texto.AppendLine();
                     
-                    if (_servicioIA is ServicioIAClaude servicioIAClaude)
+                    // Usar IA para análisis profundo página por página
                     {
                         // Analizar cada página como imagen para capturar TODA la información
                         for (int pagina = 1; pagina <= numeroPaginas; pagina++)
@@ -590,27 +590,17 @@ Responde en español con un análisis profesional y detallado.";
                 {
                     try
                     {
-                        resultado.AppendLine("🤖 **ANÁLISIS CON CLAUDE VISION:**");
+                        resultado.AppendLine("🤖 **ANÁLISIS PROFUNDO CON IA AVANZADA:**");
                         resultado.AppendLine();
                         
-                        // Usar Claude Vision para análisis completo
-                        if (_servicioIA is ServicioIAClaude servicioIAClaude)
-                        {
-                            var analisisClaudeVision = await servicioIAClaude.AnalizarImagenConClaudeVisionAsync(rutaArchivo);
-                            resultado.AppendLine(analisisClaudeVision);
-                            resultado.AppendLine();
-                        }
-                        else
-                        {
-                            // Si no es ServicioIAClaude, usar análisis genérico
-                            var contenidoBasico = await ObtenerMetadatosBasicosImagenAsync(rutaArchivo);
-                            var analisisIA = await _servicioIA.AnalizarContenidoConIAAsync(
-                                contenidoBasico, 
-                                "Analiza esta imagen y extrae toda la información relevante, especialmente cualquier texto visible."
-                            );
-                            resultado.AppendLine(analisisIA);
-                            resultado.AppendLine();
-                        }
+                        // Usar IA para análisis completo de imágenes
+                        var contenidoBasico = await ObtenerMetadatosBasicosImagenAsync(rutaArchivo);
+                        var analisisIA = await _servicioIA.AnalizarContenidoConIAAsync(
+                            contenidoBasico, 
+                            "Analiza esta imagen y extrae toda la información relevante, especialmente cualquier texto visible."
+                        );
+                        resultado.AppendLine(analisisIA);
+                        resultado.AppendLine();
                     }
                     catch (Exception ex)
                     {

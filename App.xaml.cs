@@ -39,7 +39,10 @@ namespace ChatbotGomarco
                 var servicioIA = provider.GetService<IServicioIA>();
                 return new ServicioExtraccionContenido(logger, servicioIA);
             });
-            servicios.AddSingleton<IServicioIA, ServicioIAClaude>();
+            
+            // Configurar HttpClient para OpenAI
+            servicios.AddHttpClient();
+            servicios.AddSingleton<IServicioIA, ServicioIAOpenAI>();
 
             // Servicios LLM modulares
             servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();

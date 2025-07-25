@@ -119,42 +119,89 @@ function Update-SourceCode {
         return
     }
     
-    Write-LogMessage "🔄 Sincronizando con repositorio Git..." -Level INFO
+    Write-LogMessage "🔄 Verificando actualizaciones del repositorio Git..." -Level INFO
     
     # Verificar si Git está disponible
     try {
         $gitVersion = & git --version 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-LogMessage "⚠️  Git no disponible, usando código local" -Level WARN
+            Write-LogMessage "⚠️  Git no disponible - usando código local" -Level WARN
             return
         }
     }
     catch {
-        Write-LogMessage "⚠️  Git no disponible, usando código local" -Level WARN
+        Write-LogMessage "⚠️  Git no disponible - usando código local" -Level WARN
         return
     }
     
     try {
-        # Verificar estado del repositorio
-        $gitStatus = & git status --porcelain 2>$null
-        if ($gitStatus) {
-            Write-LogMessage "⚠️  Hay cambios locales sin confirmar" -Level WARN
-            Write-LogMessage "    Realizando stash automático..." -Level INFO
-            & git stash push -m "Auto-stash antes de actualización $(Get-Date)" 2>$null
+        # Primero hacer fetch para ver si hay actualizaciones remotas
+        Write-LogMessage "    └─ Verificando actualizaciones remotas..." -Level INFO
+        & git fetch origin master 2>$null
+        
+        # Verificar si hay actualizaciones remotas disponibles
+        $localCommit = & git rev-parse HEAD 2>$null
+        $remoteCommit = & git rev-parse origin/master 2>$null
+        
+        if ($localCommit -eq $remoteCommit) {
+            Write-LogMessage "✅ Repositorio ya está actualizado - preservando cambios locales" -Level SUCCESS
+            return
         }
         
-        # Actualizar desde origin
-        Write-LogMessage "    └─ Ejecutando git pull..." -Level INFO
-        $pullResult = & git pull origin master 2>&1
+        # Verificar si hay cambios locales
+        $gitStatus = & git status --porcelain 2>$null
+        $hasLocalChanges = $gitStatus -ne $null -and $gitStatus.Length -gt 0
         
-        if ($LASTEXITCODE -eq 0) {
-            Write-LogMessage "✅ Código fuente actualizado desde Git" -Level SUCCESS
+        if ($hasLocalChanges) {
+            Write-LogMessage "📋 Hay cambios locales Y actualizaciones remotas disponibles" -Level INFO
+            Write-LogMessage "    └─ Cambios locales detectados:" -Level INFO
+            $gitStatus | ForEach-Object { Write-LogMessage "      • $_" -Level INFO }
+            
+            # Estrategia inteligente: intentar rebase automático
+            Write-LogMessage "    └─ Intentando fusión inteligente con rebase..." -Level INFO
+            & git stash push -m "Auto-stash para rebase $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" 2>$null
+            
+            $pullResult = & git pull --rebase origin master 2>&1
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-LogMessage "✅ Código actualizado exitosamente con rebase" -Level SUCCESS
+                
+                # Intentar restaurar cambios locales
+                $stashList = & git stash list 2>$null
+                if ($stashList -match "Auto-stash para rebase") {
+                    Write-LogMessage "    └─ Restaurando cambios locales..." -Level INFO
+                    $popResult = & git stash pop 2>&1
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-LogMessage "✅ Cambios locales restaurados exitosamente" -Level SUCCESS
+                    } else {
+                        Write-LogMessage "⚠️  Conflictos detectados al restaurar cambios:" -Level WARN
+                        Write-LogMessage "      $($popResult -join "`n")" -Level WARN
+                        Write-LogMessage "    └─ Puedes resolver conflictos manualmente después" -Level INFO
+                    }
+                }
+            } else {
+                Write-LogMessage "❌ Error en rebase automático:" -Level ERROR
+                Write-LogMessage "    $($pullResult -join "`n")" -Level ERROR
+                
+                # Restaurar stash en caso de error
+                & git stash pop 2>$null
+                Write-LogMessage "⚠️  Cambios locales restaurados - actualización omitida" -Level WARN
+            }
         } else {
-            Write-LogMessage "⚠️  Warning: No se pudo actualizar desde Git - $pullResult" -Level WARN
+            # No hay cambios locales, pull directo
+            Write-LogMessage "    └─ Sin cambios locales - actualizando directamente..." -Level INFO
+            $pullResult = & git pull origin master 2>&1
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-LogMessage "✅ Código fuente actualizado desde Git" -Level SUCCESS
+            } else {
+                Write-LogMessage "⚠️  Warning: No se pudo actualizar - $($pullResult -join "`n")" -Level WARN
+            }
         }
     }
     catch {
         Write-LogMessage "⚠️  Error en operación Git: $($_.Exception.Message)" -Level WARN
+        Write-LogMessage "    └─ Continuando con código local..." -Level INFO
     }
 }
 

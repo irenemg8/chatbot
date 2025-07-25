@@ -65,12 +65,22 @@ Antes de ejecutar cualquier script, verifica que tengas:
 ```
 
 **✨ Características Empresariales del Script PowerShell:**
-- 🎛️ **Parámetros configurables** para diferentes escenarios
+- 🧠 **Git Inteligente**: Preserva automáticamente cambios locales sin `git stash` innecesario
+- 🔍 **Detección Remota**: Solo actualiza cuando hay cambios reales en el repositorio
+- 🔄 **Rebase Automático**: Fusiona cambios automáticamente cuando es posible
+- 🎛️ **Parámetros configurables** para diferentes escenarios  
 - 📊 **Logging estructurado** con códigos de color
 - 🔄 **Rotación automática** de logs antiguos
 - ⚡ **Validaciones robustas** de prerrequisitos
 - 🛡️ **Manejo avanzado** de errores y excepciones
 - 📈 **Reportes detallados** del proceso de deployment
+
+**🔧 Gestión Inteligente de Git:**
+```
+✅ Sin actualizaciones remotas → Preserva cambios locales
+✅ Con actualizaciones remotas + sin cambios locales → Actualiza directamente  
+✅ Con actualizaciones remotas + cambios locales → Rebase inteligente
+```
 
 ---
 

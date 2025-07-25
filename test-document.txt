@@ -1,0 +1,47 @@
+DOCUMENTO DE PRUEBA - CHATBOT GOMARCO
+==========================================
+
+**Empresa:** GOMARCO S.A.
+**Fecha:** 25 de Julio de 2025
+**Departamento:** Tecnología e Innovación
+
+**INFORME DE MIGRACIÓN A OPENAI**
+
+**1. DATOS TÉCNICOS**
+- Modelo anterior: Claude 4 Sonnet
+- Modelo actual: OpenAI GPT-4 Turbo
+- Fecha de migración: 25/07/2025
+- Responsable: DevOps Team
+
+**2. MÉTRICAS DE RENDIMIENTO**
+- Velocidad de respuesta: 2.3 segundos promedio
+- Precisión de análisis: 95%
+- Tokens por consulta: 3,200 promedio
+- Costo estimado: $0.03 por consulta
+
+**3. ANÁLISIS DE DOCUMENTOS SOPORTADOS**
+- PDF: ✅ Soporte completo
+- Word (.docx): ✅ Extracción de texto y tablas
+- Excel (.xlsx): ✅ Análisis de datos y tendencias
+- Imágenes (JPG, PNG): ✅ OCR y análisis visual
+- PowerPoint (.pptx): ✅ Contenido y estructura
+
+**4. FUNCIONALIDADES CLAVE**
+a) Conversación natural con contexto empresarial
+b) Análisis profundo de documentos corporativos
+c) Extracción de datos estructurados
+d) Generación de resúmenes ejecutivos
+e) Sugerencias de preguntas inteligentes
+
+**5. PRÓXIMOS PASOS**
+- Testing completo con documentos reales
+- Capacitación del equipo administrativo
+- Implementación en producción Q4 2025
+- Métricas de adopción y satisfacción
+
+**CONCLUSIÓN:**
+La migración a OpenAI GPT-4 mejora significativamente las capacidades de análisis de documentos y conversación natural, manteniendo la seguridad y privacidad empresarial.
+
+---
+**Contacto:** devops@gomarco.com
+**Versión:** 2.0 Enterprise 

@@ -30,6 +30,12 @@ namespace ChatbotGomarco.ViewModelos
         private bool _estaCargandoArchivo = false;
 
         [ObservableProperty]
+        private bool _estaPensandoConIA = false;
+
+        [ObservableProperty]
+        private string _mensajePensamiento = string.Empty;
+
+        [ObservableProperty]
         private SesionChat? _sesionActual;
 
         [ObservableProperty]
@@ -126,13 +132,43 @@ namespace ChatbotGomarco.ViewModelos
 
                 // Procesar mensaje con IA
                 var archivosContexto = ArchivosSubidos.ToList();
-                var respuestaIA = await _servicioChatbot.ProcesarMensajeAsync(
-                    mensajeUsuario, SesionActual.Id, archivosContexto);
+                
+                // Mostrar indicador de pensamiento
+                EstaPensandoConIA = true;
+                var tieneArchivos = archivosContexto.Any();
+                MensajePensamiento = tieneArchivos 
+                    ? $"🤖 Analizando {archivosContexto.Count} archivo(s) con IA avanzada..."
+                    : "🤖 Procesando consulta con IA avanzada...";
 
-                // Agregar respuesta del asistente
-                var mensajeAsistente = await _servicioHistorial.AgregarMensajeAsync(
-                    SesionActual.Id, respuestaIA, TipoMensaje.Asistente);
-                MensajesChat.Add(mensajeAsistente);
+                // Agregar mensaje temporal de "pensando" 
+                var mensajePensando = new MensajeChat
+                {
+                    Id = 0, // Temporal, no se guarda en BD
+                    Contenido = MensajePensamiento,
+                    TipoMensaje = TipoMensaje.Asistente,
+                    FechaCreacion = DateTime.Now,
+                    IdSesionChat = SesionActual.Id
+                };
+                MensajesChat.Add(mensajePensando);
+
+                try
+                {
+                    var respuestaIA = await _servicioChatbot.ProcesarMensajeAsync(
+                        mensajeUsuario, SesionActual.Id, archivosContexto);
+
+                    // Quitar mensaje de "pensando"
+                    MensajesChat.Remove(mensajePensando);
+
+                    // Agregar respuesta real del asistente
+                    var mensajeAsistente = await _servicioHistorial.AgregarMensajeAsync(
+                        SesionActual.Id, respuestaIA, TipoMensaje.Asistente);
+                    MensajesChat.Add(mensajeAsistente);
+                }
+                finally
+                {
+                    EstaPensandoConIA = false;
+                    MensajePensamiento = string.Empty;
+                }
 
                 // Generar sugerencias
                 await GenerarSugerenciasAsync();
@@ -421,10 +457,11 @@ namespace ChatbotGomarco.ViewModelos
             {
                 // Solicitar clave API mediante un cuadro de entrada simple
                 var resultado = Microsoft.VisualBasic.Interaction.InputBox(
-                    "Ingresa tu clave de API de Anthropic Claude para activar la IA avanzada:\n\n" +
+                    "Ingresa tu clave de API de OpenAI para activar la IA avanzada:\n\n" +
                     "• La clave se mantendrá solo durante esta sesión\n" +
-                    "• Obtenla en: https://console.anthropic.com/api-keys",
-                    "🤖 Configurar Claude IA Avanzada",
+                    "• Obtenla en: https://platform.openai.com/api-keys\n" +
+                    "• Formato: sk-...",
+                    "🤖 Configurar OpenAI GPT-4",
                     "");
 
                 if (!string.IsNullOrEmpty(resultado))
@@ -435,13 +472,13 @@ namespace ChatbotGomarco.ViewModelos
                     if (IADisponible)
                     {
                         System.Windows.MessageBox.Show(
-                            "🚀 ¡Claude IA Avanzada activada exitosamente!\n\n" +
+                            "🚀 ¡OpenAI GPT-4 activado exitosamente!\n\n" +
                             "Tu chatbot ahora puede:\n" +
-                            "• Conversar naturalmente con la potencia de Claude\n" +
+                            "• Conversar naturalmente con la potencia de GPT-4\n" +
                             "• Analizar documentos e imágenes con IA avanzada\n" +
                             "• Generar respuestas inteligentes y contextuales\n" +
                             "• Mantener conversaciones profundas y complejas",
-                            "Claude IA Configurada",
+                            "OpenAI GPT-4 Configurado",
                             System.Windows.MessageBoxButton.OK,
                             System.Windows.MessageBoxImage.Information);
                     }
@@ -470,7 +507,7 @@ namespace ChatbotGomarco.ViewModelos
         private void ActualizarEstadoIA()
         {
             IADisponible = _servicioChatbot.EstaIADisponible();
-            EstadoIA = IADisponible ? "🤖 IA Avanzada ACTIVADA" : "⚠️ IA no configurada";
+            EstadoIA = IADisponible ? "🤖 GPT-4 ACTIVADO" : "⚠️ OpenAI no configurado";
         }
     }
 } 
