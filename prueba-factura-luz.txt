@@ -1,0 +1,35 @@
+FACTURA ELÉCTRICA - IBERDROLA
+=====================================
+
+**DATOS DEL CLIENTE:**
+- Cliente: Vicente Pérez García
+- NIF: 12345678X  
+- Dirección: Calle Mayor 123, 28001 Madrid
+- Fecha Factura: 15 de Julio de 2025
+- Período: 15/06/2025 - 15/07/2025
+
+**CONSUMO ELÉCTRICO:**
+- Potencia Contratada: 4.4 kW
+- Consumo Total: 245 kWh
+- Lectura Anterior: 12,350 kWh
+- Lectura Actual: 12,595 kWh
+
+**DETALLE DE COSTES:**
+- Término de Potencia: €23.45
+- Término de Energía: €41.80  
+- Impuesto Eléctrico: €1.50
+- IVA (21%): €13.99
+- **TOTAL A PAGAR: €80.74**
+
+**VENCIMIENTO:** 05/08/2025
+
+**DATOS TÉCNICOS:**
+- CUPS: ES0031406512345678901234567890AB
+- Tarifa: 2.0TD
+- Equipo de Medida: Digital Smart Meter
+- Tipo de Suministro: Monofásico
+
+**COMPARATIVA:**
+- Mes anterior: €75.20
+- Mismo mes año anterior: €68.90
+- Incremento: 7.4% 

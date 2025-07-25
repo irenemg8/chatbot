@@ -133,19 +133,19 @@ namespace ChatbotGomarco.ViewModelos
                 // Procesar mensaje con IA
                 var archivosContexto = ArchivosSubidos.ToList();
                 
-                // Mostrar indicador de pensamiento
+                // Mostrar indicador de pensamiento inteligente
                 EstaPensandoConIA = true;
                 var tieneArchivos = archivosContexto.Any();
-                MensajePensamiento = tieneArchivos 
-                    ? $"🤖 Analizando {archivosContexto.Count} archivo(s) con IA avanzada..."
-                    : "🤖 Procesando consulta con IA avanzada...";
+                
+                // 🧠 Mensaje de pensamiento contextual
+                MensajePensamiento = GenerarMensajePensamientoInteligente(mensajeUsuario, archivosContexto);
 
-                // Agregar mensaje temporal de "pensando" 
+                // Agregar mensaje temporal de "pensando" con estilo especial
                 var mensajePensando = new MensajeChat
                 {
                     Id = 0, // Temporal, no se guarda en BD
                     Contenido = MensajePensamiento,
-                    TipoMensaje = TipoMensaje.Asistente,
+                    TipoMensaje = TipoMensaje.Sistema, // Usar tipo especial para pensamiento
                     FechaCreacion = DateTime.Now,
                     IdSesionChat = SesionActual.Id
                 };
@@ -508,6 +508,92 @@ namespace ChatbotGomarco.ViewModelos
         {
             IADisponible = _servicioChatbot.EstaIADisponible();
             EstadoIA = IADisponible ? "🤖 GPT-4 ACTIVADO" : "⚠️ OpenAI no configurado";
+        }
+        
+        /// <summary>
+        /// 🧠 Genera mensajes de pensamiento contextuales e inteligentes
+        /// </summary>
+        private string GenerarMensajePensamientoInteligente(string mensajeUsuario, System.Collections.Generic.List<ArchivoSubido> archivos)
+        {
+            var mensajeLower = mensajeUsuario.ToLowerInvariant();
+            var tieneArchivos = archivos.Any();
+            
+            if (!tieneArchivos)
+            {
+                // Mensajes para consultas sin archivos
+                if (mensajeLower.Contains("hola") || mensajeLower.Contains("buenos") || mensajeLower.Contains("saludos"))
+                    return "👋 MARCO preparando respuesta personalizada...";
+                
+                return "🤖 MARCO procesando tu consulta con GPT-4...";
+            }
+            
+            // Análisis inteligente por tipo de archivo y consulta
+            var tipoConsulta = DeterminarTipoConsulta(mensajeLower);
+            var tipoArchivo = DeterminarTipoArchivo(archivos);
+            var cantidad = archivos.Count;
+            
+            if (tipoConsulta == "calcular" && tipoArchivo == "factura")
+            {
+                if (cantidad == 1)
+                    return "🧮 MARCO calculando totales de tu factura...";
+                else
+                    return $"📊 MARCO analizando {cantidad} facturas y calculando promedios...";
+            }
+            
+            if (tipoConsulta == "resumir" && tipoArchivo == "informe")
+                return "📈 MARCO analizando informe financiero y preparando resumen ejecutivo...";
+            
+            if (tipoConsulta == "fechas")
+                return "📅 MARCO identificando fechas importantes en tus documentos...";
+            
+            if (tipoConsulta == "personas")
+                return "👥 MARCO buscando contactos y personas clave...";
+            
+            if (cantidad == 1)
+                return "🔍 MARCO analizando tu documento con GPT-4...";
+            
+            return $"📋 MARCO procesando {cantidad} documentos de forma inteligente...";
+        }
+        
+        /// <summary>
+        /// 🎯 Determina el tipo de consulta del usuario
+        /// </summary>
+        private string DeterminarTipoConsulta(string mensajeLower)
+        {
+            if (mensajeLower.Contains("cuánto") || mensajeLower.Contains("total") || mensajeLower.Contains("suma") || mensajeLower.Contains("promedio"))
+                return "calcular";
+            
+            if (mensajeLower.Contains("resumen") || mensajeLower.Contains("resume"))
+                return "resumir";
+            
+            if (mensajeLower.Contains("cuándo") || mensajeLower.Contains("fecha") || mensajeLower.Contains("cuando"))
+                return "fechas";
+            
+            if (mensajeLower.Contains("quién") || mensajeLower.Contains("contacto") || mensajeLower.Contains("persona"))
+                return "personas";
+            
+            return "general";
+        }
+        
+        /// <summary>
+        /// 📄 Determina el tipo principal de archivo
+        /// </summary>
+        private string DeterminarTipoArchivo(System.Collections.Generic.List<ArchivoSubido> archivos)
+        {
+            if (!archivos.Any()) return "ninguno";
+            
+            var nombres = string.Join(" ", archivos.Select(a => a.NombreOriginal.ToLowerInvariant()));
+            
+            if (nombres.Contains("factura") || nombres.Contains("invoice"))
+                return "factura";
+            
+            if (nombres.Contains("informe") || nombres.Contains("report"))
+                return "informe";
+            
+            if (nombres.Contains("contrato") || nombres.Contains("contract"))
+                return "contrato";
+            
+            return "documento";
         }
     }
 } 

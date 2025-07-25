@@ -2043,7 +2043,10 @@ namespace ChatbotGomarco.Servicios
         {
             try
             {
-                return await _servicioIA.GenerarRespuestaAsync(mensaje, contextoArchivos, historialConversacion);
+                // 🧠 ANÁLISIS CONTEXTUAL INTELIGENTE
+                var mensajeOptimizado = await OptimizarMensajeConContexto(mensaje, contextoArchivos);
+                
+                return await _servicioIA.GenerarRespuestaAsync(mensajeOptimizado.Mensaje, mensajeOptimizado.Contexto, historialConversacion);
             }
             catch (Exception ex)
             {
@@ -2051,6 +2054,57 @@ namespace ChatbotGomarco.Servicios
                 return GenerarRespuestaGeneral(mensaje);
             }
         }
+        
+        /// <summary>
+        /// 🎯 Optimiza el mensaje y contexto para obtener respuestas más inteligentes y específicas
+        /// </summary>
+        private async Task<(string Mensaje, string Contexto)> OptimizarMensajeConContexto(string mensajeOriginal, string contextoArchivos)
+        {
+            if (string.IsNullOrEmpty(contextoArchivos))
+            {
+                return (mensajeOriginal, contextoArchivos);
+            }
+            
+            // 📊 Identificar tipo de documento y optimizar consulta
+            var tipoDocumento = IdentificarTipoDocumento(contextoArchivos);
+            var intencionUsuario = AnalizarIntencionUsuario(mensajeOriginal);
+            
+            var mensajeOptimizado = mensajeOriginal;
+            var contextoOptimizado = $"ANÁLISIS CONTEXTUAL: {tipoDocumento} - {intencionUsuario}\n\nCONTENIDO:\n{contextoArchivos}";
+            
+            return (mensajeOptimizado, contextoOptimizado);
+        }
+        
+        /// <summary>
+        /// 🔍 Identifica inteligentemente el tipo de documento basado en su contenido
+        /// </summary>
+        private string IdentificarTipoDocumento(string contenido)
+        {
+            var contenidoLower = contenido.ToLowerInvariant();
+            
+            // Patrones para identificar tipos de documentos
+            if (contenidoLower.Contains("factura") || contenidoLower.Contains("invoice") || contenidoLower.Contains("total:") || contenidoLower.Contains("importe"))
+                return "factura";
+            
+            if (contenidoLower.Contains("informe") || contenidoLower.Contains("report") || contenidoLower.Contains("trimestre") || contenidoLower.Contains("quarterly"))
+                return "informe_financiero";
+            
+            if (contenidoLower.Contains("contrato") || contenidoLower.Contains("contract") || contenidoLower.Contains("términos") || contenidoLower.Contains("cláusulas"))
+                return "contrato";
+            
+            if (contenidoLower.Contains("cv") || contenidoLower.Contains("curriculum") || contenidoLower.Contains("experiencia") || contenidoLower.Contains("educación"))
+                return "curriculum";
+            
+            if (contenidoLower.Contains("receta") || contenidoLower.Contains("ingredientes") || contenidoLower.Contains("preparación") || contenidoLower.Contains("cocinar"))
+                return "receta";
+            
+            if (contenidoLower.Contains("presupuesto") || contenidoLower.Contains("budget") || contenidoLower.Contains("gastos") || contenidoLower.Contains("ingresos"))
+                return "presupuesto";
+            
+            return "documento_general";
+        }
+        
+
 
         public async Task<string> AnalizarMultiplesArchivosConIAAsync(List<ArchivoSubido> archivos, string pregunta)
         {
