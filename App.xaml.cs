@@ -42,6 +42,10 @@ namespace ChatbotGomarco
             
             // Configurar HttpClient para OpenAI
             servicios.AddHttpClient();
+            
+            // Servicios de seguridad enterprise
+            servicios.AddSingleton<IDetectorDatosSensibles, DetectorDatosSensibles>();
+            servicios.AddSingleton<IServicioAuditoriaSeguridad, ServicioAuditoriaSeguridad>();
             servicios.AddSingleton<IServicioIA, ServicioIAOpenAI>();
 
             // Servicios LLM modulares

@@ -1,9 +1,3 @@
-C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco.csproj.AssemblyReference.cache
-C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaPrincipal.g.cs
-C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\App.g.cs
-C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
-C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco_MarkupCompile.cache
-C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco_MarkupCompile.lref
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows\x86\leptonica-1.82.0.dll
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows\x86\tesseract50.dll
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows\x64\leptonica-1.82.0.dll
@@ -84,6 +78,12 @@ C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\bin\Debug\net8.0-windows\runtimes\win-x86\native\e_sqlite3.dll
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco.csproj.AssemblyReference.cache
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaPrincipal.g.cs
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\App.g.cs
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco_MarkupCompile.cache
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco_MarkupCompile.lref
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\App.baml
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaPrincipal.baml
 C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco.g.resources

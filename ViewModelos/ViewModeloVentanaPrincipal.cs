@@ -246,11 +246,10 @@ namespace ChatbotGomarco.ViewModelos
 
             ArchivosSubidos.Add(archivo);
 
-            // Analizar archivo y agregar mensaje informativo
-            var analisisArchivo = await _servicioChatbot.AnalizarArchivoAsync(archivo);
+            // Mensaje simple de confirmación
             var mensajeSistema = await _servicioHistorial.AgregarMensajeAsync(
                 SesionActual.Id, 
-                $"📁 **Archivo cargado:** {archivo.NombreOriginal}\n\n{analisisArchivo}", 
+                $"✅ Archivo cargado: {archivo.NombreOriginal}", 
                 TipoMensaje.Sistema,
                 archivo.RutaArchivoCifrado,
                 archivo.NombreOriginal);
@@ -522,9 +521,9 @@ namespace ChatbotGomarco.ViewModelos
             {
                 // Mensajes para consultas sin archivos
                 if (mensajeLower.Contains("hola") || mensajeLower.Contains("buenos") || mensajeLower.Contains("saludos"))
-                    return "👋 MARCO preparando respuesta personalizada...";
+                    return "👋 IA de GOMARCO preparando respuesta personalizada...";
                 
-                return "🤖 MARCO procesando tu consulta con GPT-4...";
+                return "🤖 IA de GOMARCO procesando tu consulta con GPT-4...";
             }
             
             // Análisis inteligente por tipo de archivo y consulta
@@ -535,24 +534,24 @@ namespace ChatbotGomarco.ViewModelos
             if (tipoConsulta == "calcular" && tipoArchivo == "factura")
             {
                 if (cantidad == 1)
-                    return "🧮 MARCO calculando totales de tu factura...";
+                    return "🧮 IA de GOMARCO calculando totales de tu factura...";
                 else
-                    return $"📊 MARCO analizando {cantidad} facturas y calculando promedios...";
+                    return $"📊 IA de GOMARCO analizando {cantidad} facturas y calculando promedios...";
             }
             
             if (tipoConsulta == "resumir" && tipoArchivo == "informe")
-                return "📈 MARCO analizando informe financiero y preparando resumen ejecutivo...";
+                return "📈 IA de GOMARCO analizando informe financiero y preparando resumen ejecutivo...";
             
             if (tipoConsulta == "fechas")
-                return "📅 MARCO identificando fechas importantes en tus documentos...";
+                return "📅 IA de GOMARCO identificando fechas importantes en tus documentos...";
             
             if (tipoConsulta == "personas")
-                return "👥 MARCO buscando contactos y personas clave...";
+                return "👥 IA de GOMARCO buscando contactos y personas clave...";
             
             if (cantidad == 1)
-                return "🔍 MARCO analizando tu documento con GPT-4...";
+                return "🔍 IA de GOMARCO analizando tu documento con GPT-4...";
             
-            return $"📋 MARCO procesando {cantidad} documentos de forma inteligente...";
+            return $"📋 IA de GOMARCO procesando {cantidad} documentos de forma inteligente...";
         }
         
         /// <summary>

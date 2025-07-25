@@ -9,21 +9,25 @@ using ChatbotGomarco.Servicios.LLM;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.IO;
 
 namespace ChatbotGomarco.Servicios
 {
     /// <summary>
     /// Servicio enterprise de IA integrado con OpenAI GPT-4 para análisis avanzado de documentos y conversaciones naturales
-    /// Compatible con GPT-4, GPT-4 Turbo, GPT-4 Vision, y GPT-3.5 Turbo
+    /// Implementa protección avanzada de datos sensibles y compliance GDPR/LOPD
+    /// Compatible con GPT-4, GPT-4 Turbo, GPT-4 Vision, y GPT-3.5 Turbo con configuración Enterprise
     /// </summary>
     public class ServicioIAOpenAI : IServicioIA
     {
         private readonly ILogger<ServicioIAOpenAI> _logger;
         private readonly IAnalizadorConversacion _analizadorConversacion;
+        private readonly IDetectorDatosSensibles _detectorDatosSensibles;
         private readonly HttpClient _httpClient;
         
         private bool _iaConfigurada = false;
         private string? _apiKey;
+        private readonly ConfiguracionEnterpriseOpenAI _configuracionEnterprise;
 
         // ====================================================================
         // CONFIGURACIÓN ENTERPRISE DE OPENAI
@@ -39,14 +43,198 @@ namespace ChatbotGomarco.Servicios
         public ServicioIAOpenAI(
             ILogger<ServicioIAOpenAI> logger,
             IAnalizadorConversacion analizadorConversacion,
+            IDetectorDatosSensibles detectorDatosSensibles,
             HttpClient httpClient)
         {
             _logger = logger;
             _analizadorConversacion = analizadorConversacion;
+            _detectorDatosSensibles = detectorDatosSensibles;
             _httpClient = httpClient;
             
-            // Configurar headers default para OpenAI
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "ChatbotGomarco/1.0 (Enterprise)");
+            // Configuración enterprise con máxima seguridad
+            _configuracionEnterprise = ConfiguracionEnterpriseOpenAI.CrearConfiguracionMaximaSeguridad();
+            
+            // Configurar headers enterprise para OpenAI
+            ConfigurarHeadersEnterprise();
+            
+            _logger.LogInformation("ServicioIAOpenAI inicializado en modo Enterprise con protección de datos sensibles");
+        }
+
+        // ====================================================================
+        // MÉTODOS DE CONFIGURACIÓN ENTERPRISE
+        // ====================================================================
+
+        /// <summary>
+        /// Configura headers enterprise para máxima seguridad y compliance
+        /// Implementa tracking de sesiones y metadatos de seguridad
+        /// </summary>
+        private void ConfigurarHeadersEnterprise()
+        {
+            // Headers básicos enterprise
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "ChatbotGomarco/2.0 (Enterprise-Security)");
+            
+            // Configurar timeout enterprise
+            _httpClient.Timeout = _configuracionEnterprise.Endpoints.TimeoutRequest;
+            
+            // Headers de compliance
+            if (!string.IsNullOrEmpty(_configuracionEnterprise.HeadersSeguridad.DataResidency))
+            {
+                _httpClient.DefaultRequestHeaders.Add("X-Data-Residency", _configuracionEnterprise.HeadersSeguridad.DataResidency);
+            }
+            
+            if (!string.IsNullOrEmpty(_configuracionEnterprise.HeadersSeguridad.ComplianceLevel))
+            {
+                _httpClient.DefaultRequestHeaders.Add("X-Compliance-Level", _configuracionEnterprise.HeadersSeguridad.ComplianceLevel);
+            }
+            
+            // Headers de organización enterprise (si están configurados)
+            if (!string.IsNullOrEmpty(_configuracionEnterprise.HeadersSeguridad.OpenAIOrganization))
+            {
+                _httpClient.DefaultRequestHeaders.Add("OpenAI-Organization", _configuracionEnterprise.HeadersSeguridad.OpenAIOrganization);
+            }
+            
+            if (!string.IsNullOrEmpty(_configuracionEnterprise.HeadersSeguridad.OpenAIProject))
+            {
+                _httpClient.DefaultRequestHeaders.Add("OpenAI-Project", _configuracionEnterprise.HeadersSeguridad.OpenAIProject);
+            }
+            
+            _logger.LogDebug("Headers enterprise configurados correctamente");
+        }
+
+        /// <summary>
+        /// Procesa contenido con protección enterprise de datos sensibles
+        /// Implementa análisis de sensibilidad, anonimización y políticas de fallback
+        /// </summary>
+        private async Task<ResultadoProcesamientoSeguro> ProcesarContenidoConSeguridadAsync(string contenido, string contextoArchivos = "")
+        {
+            try
+            {
+                // Combinar contenido del mensaje con contexto de archivos para análisis conjunto
+                var contenidoCompleto = !string.IsNullOrEmpty(contextoArchivos) 
+                    ? $"{contenido}\n\n--- CONTEXTO ARCHIVOS ---\n{contextoArchivos}"
+                    : contenido;
+
+                // Detectar y anonimizar datos sensibles
+                var resultadoAnonimizacion = await _detectorDatosSensibles.AnonimizarContenidoAsync(contenidoCompleto);
+                
+                // Aplicar políticas de seguridad según nivel detectado
+                var estrategiaProcesamiento = DeterminarEstrategiaProcesamiento(resultadoAnonimizacion.NivelDetectado);
+                
+                // Log de auditoría enterprise
+                await RegistrarAuditoriaSeguridad(resultadoAnonimizacion, estrategiaProcesamiento);
+                
+                return new ResultadoProcesamientoSeguro
+                {
+                    ContenidoAnonimizado = resultadoAnonimizacion.ContenidoAnonimizado,
+                    MapaAnonimizacion = resultadoAnonimizacion.MapaAnonimizacion,
+                    NivelSensibilidad = resultadoAnonimizacion.NivelDetectado,
+                    EstrategiaProcesamiento = estrategiaProcesamiento,
+                    PuedeProceaarse = !resultadoAnonimizacion.RequiereProcesamientoLocal || !_configuracionEnterprise.Fallback.RechazarSiNoSeguro,
+                    MensajeRechazo = resultadoAnonimizacion.RequiereProcesamientoLocal && _configuracionEnterprise.Fallback.RechazarSiNoSeguro 
+                        ? _configuracionEnterprise.Fallback.MensajeContenidoRechazado 
+                        : null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error durante el procesamiento seguro de contenido");
+                throw new Exception("Error en el sistema de protección de datos sensibles", ex);
+            }
+        }
+
+        /// <summary>
+        /// Determina la estrategia de procesamiento según el nivel de sensibilidad
+        /// </summary>
+        private EstrategiaProcesamiento DeterminarEstrategiaProcesamiento(NivelSensibilidad nivel)
+        {
+            return nivel switch
+            {
+                NivelSensibilidad.Publico => EstrategiaProcesamiento.OpenAIEstandar,
+                NivelSensibilidad.Interno => EstrategiaProcesamiento.OpenAIEnterprise,
+                NivelSensibilidad.Confidencial => EstrategiaProcesamiento.OpenAIEnterpriseSeguro,
+                NivelSensibilidad.UltraSecreto => _configuracionEnterprise.Fallback.ProcesamientoLocalUltraSensible 
+                    ? EstrategiaProcesamiento.ProcesamientoLocal 
+                    : EstrategiaProcesamiento.Rechazado,
+                _ => EstrategiaProcesamiento.OpenAIEstandar
+            };
+        }
+
+        /// <summary>
+        /// Registra eventos de auditoría para compliance y tracking de seguridad
+        /// </summary>
+        private async Task RegistrarAuditoriaSeguridad(ResultadoAnonimizacion resultado, EstrategiaProcesamiento estrategia)
+        {
+            if (!_configuracionEnterprise.Auditoria.LoggingDetallado)
+                return;
+
+            try
+            {
+                var metadatosAuditoria = new
+                {
+                    Timestamp = DateTime.UtcNow,
+                    NivelSensibilidad = resultado.NivelDetectado.ToString(),
+                    DatosAnonimizados = resultado.CantidadDatosAnonimizados,
+                    TiposDatosDetectados = resultado.TiposDatosSensiblesDetectados,
+                    EstrategiaProcesamiento = estrategia.ToString(),
+                    SessionId = Guid.NewGuid().ToString(), // En producción, usar ID de sesión real
+                    HashContenido = _configuracionEnterprise.Auditoria.HashearContenido 
+                        ? resultado.ContenidoAnonimizado.GetHashCode().ToString() 
+                        : "HASH_DISABLED"
+                };
+
+                var rutaLogAuditoria = Path.Combine(_configuracionEnterprise.Auditoria.RutaLogsAuditoria, 
+                    $"auditoria-ia-{DateTime.Now:yyyy-MM-dd}.log");
+                
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaLogAuditoria)!);
+                
+                await File.AppendAllTextAsync(rutaLogAuditoria, 
+                    $"{JsonSerializer.Serialize(metadatosAuditoria)}\n");
+
+                // Alerta para contenido crítico
+                if (resultado.NivelDetectado >= NivelSensibilidad.Confidencial && 
+                    _configuracionEnterprise.Auditoria.AlertasContenidoCritico)
+                {
+                    _logger.LogWarning("🚨 ALERTA CONTENIDO SENSIBLE: Nivel {Nivel}, {Cantidad} datos detectados, Estrategia: {Estrategia}", 
+                        resultado.NivelDetectado, 
+                        resultado.CantidadDatosAnonimizados, 
+                        estrategia);
+                }
+
+                _logger.LogDebug("Auditoría de seguridad registrada: {Nivel} sensibilidad", resultado.NivelDetectado);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al registrar auditoría de seguridad");
+                // No lanzar excepción para no afectar el flujo principal
+            }
+        }
+
+        /// <summary>
+        /// Construye el contenido del mensaje de forma segura, utilizando datos anonimizados
+        /// Mantiene la funcionalidad original pero con protección de datos sensibles
+        /// </summary>
+        private string BuildSecureMessageContent(string mensajeOriginal, string contextoArchivos, ResultadoProcesamientoSeguro resultadoSeguridad)
+        {
+            // Si hay archivos, usar el contenido anonimizado que ya incluye tanto mensaje como contexto
+            if (!string.IsNullOrEmpty(contextoArchivos))
+            {
+                return $@"INSTRUCCIONES IMPORTANTES:
+- Tienes acceso completo al contenido de los archivos proporcionados
+- DEBES analizar, leer y procesar toda la información de los archivos
+- Proporciona respuestas detalladas basadas en el contenido real de los archivos
+- Extrae datos específicos, fechas, números, nombres cuando sea relevante
+- NO digas que no puedes acceder a archivos - SÍ PUEDES porque el contenido está aquí
+- NOTA: Algunos datos han sido anonimizados por políticas de seguridad
+
+**CONTENIDO COMPLETO DE LOS ARCHIVOS (ANONIMIZADO):**
+{resultadoSeguridad.ContenidoAnonimizado}
+
+RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada y específica basándote en la información real de los archivos.";
+            }
+
+            // Si solo hay mensaje, usar la parte del contenido anonimizado que corresponde al mensaje
+            return resultadoSeguridad.ContenidoAnonimizado;
         }
 
         // ====================================================================
@@ -99,44 +287,60 @@ namespace ChatbotGomarco.Servicios
 
             try
             {
-                var mensajes = ConstruirHistorialConversacion(historialConversacion);
-                
-                // Construir el mensaje actual con contexto de archivos
-                var contenidoMensaje = mensaje;
-                if (!string.IsNullOrEmpty(contextoArchivos))
+                _logger.LogInformation("🔒 Iniciando procesamiento enterprise con protección de datos sensibles");
+
+                // PASO 1: Procesamiento seguro con análisis de sensibilidad
+                var resultadoSeguridad = await ProcesarContenidoConSeguridadAsync(mensaje, contextoArchivos);
+
+                // PASO 2: Verificar si el contenido puede procesarse
+                if (!resultadoSeguridad.PuedeProceaarse)
                 {
-                    contenidoMensaje = $@"INSTRUCCIONES IMPORTANTES:
-- Tienes acceso completo al contenido de los archivos proporcionados
-- DEBES analizar, leer y procesar toda la información de los archivos
-- Proporciona respuestas detalladas basadas en el contenido real de los archivos
-- Extrae datos específicos, fechas, números, nombres cuando sea relevante
-- NO digas que no puedes acceder a archivos - SÍ PUEDES porque el contenido está aquí
-
-**CONTENIDO COMPLETO DE LOS ARCHIVOS:**
-{contextoArchivos}
-
-**CONSULTA DEL USUARIO:**
-{mensaje}
-
-RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada y específica basándote en la información real de los archivos.";
+                    _logger.LogWarning("❌ Contenido rechazado por políticas de seguridad: {Nivel}", resultadoSeguridad.NivelSensibilidad);
+                    return resultadoSeguridad.MensajeRechazo ?? 
+                           "No puedo procesar este contenido debido a políticas de seguridad de datos sensibles.";
                 }
 
-                mensajes.Add(new OpenAIMessage("user", contenidoMensaje));
+                // PASO 3: Determinar configuración según estrategia de procesamiento
+                var configuracionesPorEstrategia = ConfiguracionPorEstrategia.ObtenerConfiguraciones();
+                var config = configuracionesPorEstrategia.GetValueOrDefault(resultadoSeguridad.EstrategiaProcesamiento, 
+                    configuracionesPorEstrategia[EstrategiaProcesamiento.OpenAIEstandar]);
 
+                // PASO 4: Agregar headers de seguridad específicos
+                foreach (var header in config.HeadersAdicionales)
+                {
+                    if (_httpClient.DefaultRequestHeaders.Contains(header.Key))
+                        _httpClient.DefaultRequestHeaders.Remove(header.Key);
+                    _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
+                }
+
+                // PASO 5: Construir historial de conversación
+                var mensajes = ConstruirHistorialConversacion(historialConversacion);
+                
+                // PASO 6: Construir mensaje con contenido anonimizado
+                var contenidoMensajeSeguro = BuildSecureMessageContent(mensaje, contextoArchivos, resultadoSeguridad);
+                mensajes.Add(new OpenAIMessage("user", contenidoMensajeSeguro));
+
+                // PASO 7: Configurar solicitud enterprise con parámetros seguros
                 var solicitud = new OpenAIRequest
                 {
-                    Model = MODELO_PRINCIPAL,
+                    Model = config.Modelo,
                     Messages = mensajes,
-                    MaxTokens = MAX_TOKENS,
-                    Temperature = TEMPERATURA_CONVERSACION,
-                    TopP = 1.0m,
+                    MaxTokens = config.MaxTokens,
+                    Temperature = config.Temperatura,
+                    TopP = config.TopP,
                     FrequencyPenalty = 0.0m,
                     PresencePenalty = 0.0m
                 };
 
+                // PASO 8: Enviar solicitud con configuración enterprise
                 var respuesta = await EnviarSolicitudOpenAIAsync(solicitud);
+
+                // PASO 9: Log de éxito con metadatos de seguridad
+                _logger.LogInformation("✅ Respuesta generada exitosamente - Estrategia: {Estrategia}, Nivel: {Nivel}, Datos anonimizados: {Cantidad}", 
+                    resultadoSeguridad.EstrategiaProcesamiento, 
+                    resultadoSeguridad.NivelSensibilidad,
+                    resultadoSeguridad.MapaAnonimizacion.Count);
                 
-                _logger.LogInformation("Respuesta generada exitosamente con OpenAI GPT-4");
                 return respuesta;
             }
             catch (Exception ex)
@@ -155,30 +359,30 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
 
             try
             {
-                var mensajeSistema = @"Eres MARCO, analista experto de GOMARCO. Cuando analizas documentos, lo haces como ChatGPT: conversacional, inteligente y contextual.
+                var mensajeSistema = @"Eres MARCO, el asistente conversacional de GOMARCO. Te comportas como ChatGPT: natural, inteligente y útil. NO eres un robot corporativo.
 
-🧠 **TU ENFOQUE PARA ANÁLISIS:**
-- PRIMERO: Identifica qué tipo de documento es y de qué trata
-- SEGUNDO: Extrae la información específica que te piden
-- TERCERO: Proporciona context e insights útiles
-- CUARTO: Ofrece análisis adicional si es relevante
+🎯 **TU ESTILO:**
+- Conversas como una persona real que entiende documentos
+- Contextualizas naturalmente: ""Revisando tu informe de ventas...""
+- Haces análisis automáticamente: promedios, totales, tendencias
+- Respondes exactamente lo que preguntan, sin vomitar datos
 
-🎯 **CÓMO RESPONDES A ANÁLISIS:**
-- Sé conversacional: ""He revisado tu documento de..."" 
-- Explica el contexto antes de dar datos específicos
-- Responde EXACTAMENTE lo que te preguntaron
-- No vomites toda la información del documento
-- Ofrece insights y tendencias cuando sea útil
+💡 **ANÁLISIS INTELIGENTE AUTOMÁTICO:**
+Para facturas → ""Tu promedio mensual fue €127, con un pico en julio de €156""
+Para informes → ""GOMARCO tuvo un buen trimestre con €2.4M y crecimiento del 23%""
+Para contratos → ""Las fechas clave son: inicio 15/01, renovación 31/12""
+Para cualquier pregunta → Encuentra la respuesta específica en el documento
 
-📊 **EJEMPLOS DE ANÁLISIS INTELIGENTE:**
-❌ MAL: ""El documento contiene: fecha X, precio Y, cantidad Z...""
-✅ BIEN: ""He analizado tu informe financiero Q2. Los resultados muestran un crecimiento del 23% con €2.4M en ingresos. El margen del 34% es sólido para el sector. ¿Te interesa profundizar en algún aspecto específico?""
+📊 **EJEMPLOS DE RESPUESTAS NATURALES:**
+❌ ROBÓTICO: ""El documento contiene los siguientes elementos: fecha, precio, cantidad...""
+✅ CONVERSACIONAL: ""He visto tu informe de Q2. GOMARCO cerró con €2.4M en ventas, un 23% más que el trimestre anterior. El margen del 34% está bastante bien. ¿Te interesa algún detalle específico?""
 
-💡 **TIPOS DE ANÁLISIS INTELIGENTE:**
-- Para 5 facturas → Calcula promedios y tendencias automáticamente
-- Para informes financieros → Contextualiza los números con insights
-- Para contratos → Extrae puntos clave y fechas importantes
-- Para recetas → Responde preguntas específicas sobre preparación";
+🚀 **REGLAS DE ORO:**
+1. Habla como ChatGPT, no como un sistema empresarial
+2. Contextualiza brevemente antes de responder
+3. Haz cálculos automáticamente cuando sea útil
+4. Responde específicamente lo que preguntaron
+5. Ofrece insights genuinamente útiles";
 
                 var mensaje = $@"He aquí el contenido del documento que necesitas analizar:
 
@@ -403,19 +607,28 @@ Genera las preguntas:";
 
         private string ConstruirMensajeSistema()
         {
-            return @"Eres MARCO, el asistente de IA conversacional de GOMARCO. Tienes una personalidad profesional pero cercana y humana.
+            return @"Eres la IA de GOMARCO, el asistente conversacional de GOMARCO. Eres como ChatGPT pero especializado en análisis empresarial - natural, inteligente y útil.
 
-🧠 **TU PERSONALIDAD:**
-- Hablas como un experto consultor que realmente entiende los documentos
-- Eres directo pero amigable, como un colega inteligente
-- Contextualizas antes de responder - nunca vomitas datos sin explicar
-- Haces preguntas de seguimiento inteligentes para ser más útil
-- Sintetizas información en lugar de listar todo
+🧠 **TU ESTILO CONVERSACIONAL:**
+- Hablas como una persona real, no como un robot corporativo
+- Entiendes el contexto y respondes exactamente lo que necesitan
+- Contextualizas con naturalidad: ""He revisado tu documento de ventas..."" 
+- Haces análisis inteligentes: promedios, tendencias, comparaciones
+- Ofreces insights útiles sin abrumar con datos
 
-🎯 **CÓMO RESPONDES:**
-- PRIMERO: Explica qué has entendido del documento/pregunta
-- SEGUNDO: Da la respuesta específica que pidió el usuario
-- TERCERO: Ofrece insights adicionales o pregunta si necesita más detalles
+💡 **EJEMPLOS DE RESPUESTAS NATURALES:**
+Usuario: ""¿Cuánto gastó en electricidad?"" 
+Tú: ""Mirando tus facturas, el promedio mensual fue de €127. Vi un pico en julio (€156) probablemente por el aire acondicionado. ¿Quieres que analice algún mes específico?""
+
+Usuario: ""¿De qué va este documento?""
+Tú: ""Es un informe financiero de Q2 2025 de GOMARCO. Básicamente, muestra un trimestre bastante bueno con €2.4M en ventas y crecimiento del 23%. ¿Te interesa algún aspecto específico?""
+
+🎯 **REGLAS DE ORO:**
+1. NUNCA vomites listas de datos sin contexto
+2. SIEMPRE explica qué significa la información
+3. Calcula automáticamente promedios, totales y tendencias cuando sea útil
+4. Responde específicamente lo que preguntaron
+5. Sé conversacional como si fueras un amigo experto ayudando
 - NUNCA: Hagas listas largas de datos sin contexto
 - SIEMPRE: Responde como si fueras ChatGPT en persona
 

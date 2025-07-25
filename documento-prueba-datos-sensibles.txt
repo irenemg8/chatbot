@@ -1,0 +1,147 @@
+📋 DOCUMENTO CONFIDENCIAL DE PRUEBA - DETECCIÓN DE DATOS SENSIBLES
+=================================================================
+
+🔒 NIVEL: CONFIDENCIAL - SOLO PARA TESTING DE SEGURIDAD ENTERPRISE
+📅 FECHA: 15 de Enero de 2024
+🏢 EMPRESA: GOMARCO TEST SECURITY DIVISION
+
+⚠️  IMPORTANTE: Este documento contiene datos sensibles INVENTADOS para probar 
+el sistema de detección y anonimización de ChatbotGomarco Enterprise.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📂 SECCIÓN 1: DOCUMENTOS DE IDENTIDAD
+═══════════════════════════════════════
+
+Cliente Principal:
+- Nombre: Juan García Pérez
+- DNI: 47583629B
+- NIE: X7429381F
+- Teléfono móvil: +34 687432951
+- Email personal: juan.garcia@gmail.com
+
+Contacto Comercial:
+- Nombre: María López Rodríguez  
+- DNI: 32145678K
+- Teléfono fijo: 914567890
+- Email: maria.lopez@hotmail.com
+
+Director General:
+- Nombre: Carlos Fernández Martín
+- DNI: 78965432P
+- NIE: Y8374629L
+- Móvil: 612345789
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💳 SECCIÓN 2: DATOS FINANCIEROS
+═══════════════════════════════════════
+
+💰 Cuenta Bancaria Principal:
+- IBAN: ES91 2100 0418 4502 0005 1332
+- Número de cuenta: 2100-0418-45-0200051332
+
+💳 Tarjetas de Crédito Corporativas:
+- Visa Empresarial: 4532-1234-5678-9012
+- Mastercard Premium: 5412-7534-9876-5432
+- American Express: 3456-789012-34567
+
+💰 Cuentas Adicionales:
+- IBAN Backup: ES76 0049 0001 5020 1234 5678
+- Cuenta Nóminas: 0049-0001-50-2012345678
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🏢 SECCIÓN 3: IDENTIFICADORES EMPRESARIALES
+═══════════════════════════════════════════
+
+📋 Datos Corporativos:
+- CIF GOMARCO: A12345674
+- NIF Filial Madrid: B87654321
+- NIF Sucursal Barcelona: G98765432
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🏥 SECCIÓN 4: SEGURIDAD SOCIAL Y DATOS LABORALES
+═══════════════════════════════════════════
+
+👥 Empleados Key:
+- Juan García: Número SS 12-1234567890-12
+- María López: Número SS 28-9876543210-45  
+- Carlos Fernández: Número Afiliación 123456789012
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🏠 SECCIÓN 5: DIRECCIONES Y CONTACTOS
+═══════════════════════════════════════════
+
+🏢 Sede Central:
+- Dirección: Calle Mayor 123, Madrid
+- Código Postal: 28001
+- Teléfono: +34 912345678
+
+🏪 Tienda Barcelona:
+- Dirección: Avenida Diagonal 567, Barcelona  
+- Código Postal: 08029
+- Contacto: +34 934567890
+
+🏭 Almacén Valencia:
+- Dirección: Plaza España 89, Valencia
+- Código Postal: 46001
+- Móvil almacén: 687123456
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 SECCIÓN 6: DATOS FINANCIEROS DETALLADOS
+═══════════════════════════════════════════
+
+💰 Ingresos Q4 2023:
+- Ventas colchones: €2,458,750
+- Cliente VIP Hotel Luxury (DNI: 45678912C): Pedido €89,450
+- Pago con tarjeta: 4111-1111-1111-1111
+
+💳 Transacciones Importantes:
+- 15/01/2024: Transferencia €125,000 desde IBAN ES91 2100 0418 4502 0005 1332
+- 20/01/2024: Pago proveedor €67,500 a cuenta ES76 0049 0001 5020 1234 5678
+- 25/01/2024: Cobro cliente con tarjeta 5555-5555-5555-4444
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🏥 SECCIÓN 7: DATOS MÉDICOS (ULTRA-SENSIBLES)
+═══════════════════════════════════════════
+
+🚨 ADVERTENCIA: Datos médicos de empleados para test de RECHAZO automático
+
+- Juan García (DNI: 47583629B): Historia Clínica HC.123456789
+- Diagnóstico: Lumbalgia crónica, tratamiento fisioterapia
+- Médico responsable: Dr. Pérez (Colegiado COL.4567)
+
+- María López (DNI: 32145678K): Historia Clínica H.CLINICA 987654321  
+- Medicación: Ibuprofeno 600mg, revisión mensual
+- Centro: Hospital San Carlos, Madrid
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚖️ SECCIÓN 8: DATOS LEGALES (ULTRA-SENSIBLES)  
+═══════════════════════════════════════════
+
+🚨 ADVERTENCIA: Información legal ultra-confidencial
+
+📋 Caso Legal Activo:
+- Demanda cliente: Expediente 2024/0123
+- Abogado: García & Asociados
+- Juzgado: Tribunal Mercantil Madrid nº 3
+- Importe reclamado: €45,000
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔐 SECCIÓN 9: DATOS DE ACCESO Y SEGURIDAD
+═══════════════════════════════════════════
+
+🗝️ Credenciales Sistema (PARA RECHAZO AUTOMÁTICO):
+- Usuario Admin: admin_gomarco
+- Password: GoMarco2024!Secure
+- Token API: gm_1234567890abcdef
+- Clave maestra: MasterKey_GOMARCO_2024
+
+═══════════════════════════════════════════════════════════════════════════════
