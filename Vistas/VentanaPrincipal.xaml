@@ -169,17 +169,13 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Button Grid.Column="1"
-                            Style="{StaticResource EstiloBotonPrimario}"
-                            Command="{Binding AlternarPanelHistorialCommand}"
-                            Margin="8,0">
-                        <materialDesign:PackIcon Kind="History" Width="16" Height="16"/>
-                    </Button>
-
+                    <!-- Botón de Configuración Empresarial -->
                     <Button Grid.Column="2"
                             Style="{StaticResource EstiloBotonPrimario}"
-                            Command="{Binding AlternarPanelArchivosCommand}">
-                        <materialDesign:PackIcon Kind="Folder" Width="16" Height="16"/>
+                            Command="{Binding ComandoConfigurarIA}"
+                            ToolTip="🤖 Configurar IA Claude 4 y Preferencias del Sistema"
+                            Margin="8,0">
+                        <materialDesign:PackIcon Kind="Cog" Width="18" Height="18"/>
                     </Button>
                 </Grid>
             </Border>

@@ -1,0 +1,324 @@
+# ====================================================================
+# 🚀 GITIGNORE EMPRESARIAL - CHATBOT GOMARCO
+# Proyecto: .NET 8 WPF con integración Claude 4 API
+# Versión: Enterprise 2.0
+# ====================================================================
+
+# ====================================================================
+# .NET CORE / .NET 8 ARTIFACTS
+# ====================================================================
+bin/
+obj/
+out/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# ====================================================================
+# VISUAL STUDIO / RIDER SPECIFIC FILES
+# ====================================================================
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Visual Studio 2015/2017 cache/options directory
+.vs/
+# Visual Studio 2019/2022 cache/options directory
+.vscode/
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# ====================================================================
+# NUGET PACKAGES & DEPENDENCIES
+# ====================================================================
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet v3's project.json files produces more ignorable files
+*.nuget.props
+*.nuget.targets
+
+# ====================================================================
+# WPF SPECIFIC FILES
+# ====================================================================
+# WPF temporary files
+*.g.cs
+*.g.i.cs
+*.baml
+GeneratedInternalTypeHelper.cs
+
+# XAML generated files
+**/obj/**/MainWindow.g.cs
+**/obj/**/App.g.cs
+**/obj/**/*.g.cs
+**/obj/**/*.baml
+
+# ====================================================================
+# CHATBOT GOMARCO - APPLICATION SPECIFIC
+# ====================================================================
+# Logs de deployment y aplicación
+logs/
+*.log
+deployment_*.log
+error_*.log
+chatbot-*.log
+
+# Base de datos local (development)
+chatbot.db
+chatbot.db-shm
+chatbot.db-wal
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos cifrados temporales
+ArchivosTemporales/
+temp_*/
+*.enc.temp
+*.decrypt.temp
+
+# Configuraciones locales sensibles
+appsettings.local.json
+config.local.json
+claude-api-key.txt
+
+# Directorio de instalación temporal
+Instalacion/App/
+App/
+dist/
+publish/
+
+# ====================================================================
+# SECURITY & SENSITIVE DATA
+# ====================================================================
+# API Keys y secretos (NUNCA commitear)
+*.key
+*.secret
+**/secrets.json
+claude-config.json
+anthropic-key.txt
+
+# Certificados y claves privadas
+*.pfx
+*.p12
+*.pem
+*.crt
+*.cer
+
+# ====================================================================
+# SYSTEM & TEMPORARY FILES
+# ====================================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ====================================================================
+# DEVELOPMENT & TESTING
+# ====================================================================
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Performance profiler results
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# ====================================================================
+# PACKAGE MANAGERS & TOOLS
+# ====================================================================
+# Node.js (si se usa para tools adicionales)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (si se usa para scripts auxiliares)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# ====================================================================
+# ENTERPRISE DEPLOYMENT
+# ====================================================================
+# Docker
+.dockerignore
+Dockerfile.local
+docker-compose.local.yml
+
+# Azure DevOps / GitHub Actions
+.azure/
+.github/workflows/local*
+
+# Terraform (para infraestructura)
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# ====================================================================
+# IDE & EDITOR SPECIFIC
+# ====================================================================
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ====================================================================
+# BUILD & DEPLOYMENT ARTIFACTS
+# ====================================================================
+# MSBuild Binary and Structured Log
+*.binlog
+
+# NuGet Symbol Packages
+*.symbols.nupkg
+
+# Windows Store app package directories and files
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx
+*.appxbundle
+*.appxupload
+
+# ====================================================================
+# BACKUP & ARCHIVE FILES
+# ====================================================================
+*.bak
+*.backup
+*.tmp
+*.temp
+*.old
+*.orig
+*.save
+*.swp
+*.swo
+
+# Archivos comprimidos (excepto releases oficiales)
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+
+# ====================================================================
+# ENTERPRISE SPECIFIC
+# ====================================================================
+# Reportes de auditoría de código
+code-analysis-report.xml
+security-scan-results.json
+
+# Métricas de performance
+performance-*.json
+benchmark-*.txt
+
+# Documentación generada automáticamente
+docs/api/
+docs/generated/
+
+# Cache de herramientas de desarrollo
+.sonarqube/
+.scannerwork/
+
+# ====================================================================
+# CUSTOM PROJECT EXCLUSIONS
+# ====================================================================
+# Archivos de prueba temporal (desarrollo local)
+test-documents/
+sample-files/
+debug-output/
+
+# Configuraciones de desarrollador individual
+.local/
+personal-notes.md
+TODO-personal.md
+
+# Scripts de desarrollo personal
+dev-scripts/
+personal-tools/
+
+# ====================================================================
+# END OF GITIGNORE
+# ==================================================================== 
