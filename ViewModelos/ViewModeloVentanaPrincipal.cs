@@ -18,6 +18,7 @@ namespace ChatbotGomarco.ViewModelos
         private readonly IServicioChatbot _servicioChatbot;
         private readonly IServicioHistorialChats _servicioHistorial;
         private readonly IServicioArchivos _servicioArchivos;
+        private readonly IServicioConfiguracion _servicioConfiguracion;
         private readonly ILogger<ViewModeloVentanaPrincipal> _logger;
 
         [ObservableProperty]
@@ -78,11 +79,13 @@ namespace ChatbotGomarco.ViewModelos
             IServicioChatbot servicioChatbot,
             IServicioHistorialChats servicioHistorial,
             IServicioArchivos servicioArchivos,
+            IServicioConfiguracion servicioConfiguracion,
             ILogger<ViewModeloVentanaPrincipal> logger)
         {
             _servicioChatbot = servicioChatbot;
             _servicioHistorial = servicioHistorial;
             _servicioArchivos = servicioArchivos;
+            _servicioConfiguracion = servicioConfiguracion;
             _logger = logger;
 
             InicializarAsync();
@@ -94,6 +97,10 @@ namespace ChatbotGomarco.ViewModelos
             {
                 await CargarHistorialSesionesAsync();
                 await CrearNuevaSesionAsync();
+                
+                // Cargar API key guardada al iniciar
+                await CargarAPIKeyGuardadaAsync();
+                
                 ActualizarEstadoIA();
             }
             catch (Exception ex)
@@ -101,6 +108,31 @@ namespace ChatbotGomarco.ViewModelos
                 _logger.LogError(ex, "Error al inicializar la aplicación");
                 MessageBox.Show("Error al inicializar la aplicación. Verifica que tengas los permisos necesarios.", 
                     "Error de Inicialización", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Carga automáticamente la API key guardada al iniciar la aplicación
+        /// </summary>
+        private async Task CargarAPIKeyGuardadaAsync()
+        {
+            try
+            {
+                // Solo intentar cargar si el servicio de configuración está disponible
+                if (_servicioConfiguracion != null)
+                {
+                    var claveGuardada = await _servicioConfiguracion.ObtenerClaveAPIAsync();
+                    if (!string.IsNullOrEmpty(claveGuardada))
+                    {
+                        _servicioChatbot.ConfigurarClaveIA(claveGuardada);
+                        _logger.LogInformation("API key cargada automáticamente desde configuración persistente");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error al cargar API key guardada - continuando sin configuración persistente");
+                // No es crítico, la aplicación puede funcionar sin configuración persistente
             }
         }
 
@@ -450,45 +482,47 @@ namespace ChatbotGomarco.ViewModelos
             }
         }
 
-        private void ConfigurarIA()
+        private async void ConfigurarIA()
         {
             try
             {
-                // Solicitar clave API mediante un cuadro de entrada simple
-                var resultado = Microsoft.VisualBasic.Interaction.InputBox(
-                    "Ingresa tu clave de API de OpenAI para activar la IA avanzada:\n\n" +
-                    "• La clave se mantendrá solo durante esta sesión\n" +
-                    "• Obtenla en: https://platform.openai.com/api-keys\n" +
-                    "• Formato: sk-...",
-                    "🤖 Configurar OpenAI GPT-4",
-                    "");
-
-                if (!string.IsNullOrEmpty(resultado))
+                // Obtener clave actual si existe
+                var claveActual = "";
+                try
                 {
-                    _servicioChatbot.ConfigurarClaveIA(resultado);
-                    ActualizarEstadoIA();
+                    claveActual = await _servicioConfiguracion.ObtenerClaveAPIAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "No se pudo obtener la clave guardada");
+                    // Continuamos con clave vacía
+                }
+
+                // Intentar abrir la ventana moderna
+                try
+                {
+                    var ventanaPrincipal = System.Windows.Application.Current.MainWindow;
+                    var ventanaConfiguracion = new ChatbotGomarco.Vistas.VentanaConfiguracion(claveActual, IADisponible);
+                    ventanaConfiguracion.Owner = ventanaPrincipal;
                     
-                    if (IADisponible)
+                    if (ventanaConfiguracion.ShowDialog() == true)
                     {
-                        System.Windows.MessageBox.Show(
-                            "🚀 ¡OpenAI GPT-4 activado exitosamente!\n\n" +
-                            "Tu chatbot ahora puede:\n" +
-                            "• Conversar naturalmente con la potencia de GPT-4\n" +
-                            "• Analizar documentos e imágenes con IA avanzada\n" +
-                            "• Generar respuestas inteligentes y contextuales\n" +
-                            "• Mantener conversaciones profundas y complejas",
-                            "OpenAI GPT-4 Configurado",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Information);
+                        if (ventanaConfiguracion.ConfiguracionGuardada)
+                        {
+                            await ProcesarConfiguracionGuardada(ventanaConfiguracion.ClaveAPI);
+                        }
+                        else if (ventanaConfiguracion.ClaveEliminada)
+                        {
+                            await ProcesarConfiguracionEliminada();
+                        }
                     }
-                    else
-                    {
-                        System.Windows.MessageBox.Show(
-                            "❌ No se pudo configurar la IA.\n\nPor favor verifica que la clave API sea válida.",
-                            "Error de Configuración",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Warning);
-                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error en ventana moderna, usando método simple");
+                    
+                    // Fallback al método simple
+                    UsarConfiguracionSimple();
                 }
             }
             catch (Exception ex)
@@ -500,6 +534,91 @@ namespace ChatbotGomarco.ViewModelos
                     "Error",
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private async Task ProcesarConfiguracionGuardada(string claveAPI)
+        {
+            if (string.IsNullOrEmpty(claveAPI)) return;
+
+            try
+            {
+                // Guardar la clave de forma persistente
+                await _servicioConfiguracion.GuardarClaveAPIAsync(claveAPI);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No se pudo guardar la configuración persistente");
+            }
+
+            // Configurar la IA
+            _servicioChatbot.ConfigurarClaveIA(claveAPI);
+            ActualizarEstadoIA();
+
+            if (IADisponible)
+            {
+                System.Windows.MessageBox.Show(
+                    "🚀 ¡OpenAI GPT-4 activado exitosamente!\n\n" +
+                    "Tu chatbot ahora está listo para todos los chats",
+                    "OpenAI GPT-4 Configurado",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+            }
+            else
+            {
+                System.Windows.MessageBox.Show(
+                    "❌ No se pudo configurar la IA.\n\n" +
+                    "Por favor verifica que la clave API sea válida.",
+                    "Error de Configuración",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Warning);
+            }
+        }
+
+        private async Task ProcesarConfiguracionEliminada()
+        {
+            try
+            {
+                await _servicioConfiguracion.EliminarClaveAPIAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No se pudo eliminar la configuración persistente");
+            }
+
+            ActualizarEstadoIA();
+            
+            System.Windows.MessageBox.Show(
+                "Configuración eliminada\n\n" +
+                "La clave API ha sido eliminada.",
+                "Configuración Eliminada",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        }
+
+        private void UsarConfiguracionSimple()
+        {
+            // Método simple de respaldo
+            var resultado = Microsoft.VisualBasic.Interaction.InputBox(
+                "Ingresa tu clave de API de OpenAI:\n\n" +
+                "• Formato: sk-...\n" +
+                "• Obtenla en: https://platform.openai.com/api-keys",
+                "Configurar OpenAI GPT-4",
+                "");
+
+            if (!string.IsNullOrEmpty(resultado))
+            {
+                _servicioChatbot.ConfigurarClaveIA(resultado);
+                ActualizarEstadoIA();
+                
+                if (IADisponible)
+                {
+                    System.Windows.MessageBox.Show(
+                        "¡OpenAI GPT-4 activado exitosamente!",
+                        "Configuración Exitosa",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                }
             }
         }
 

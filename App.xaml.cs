@@ -29,6 +29,7 @@ namespace ChatbotGomarco
 
             // Servicios de datos
             servicios.AddSingleton<ContextoBaseDatos>();
+            servicios.AddSingleton<IServicioConfiguracion, ServicioConfiguracion>();
             servicios.AddScoped<IServicioCifrado, ServicioCifrado>();
             servicios.AddScoped<IServicioArchivos, ServicioArchivos>();
             servicios.AddScoped<IServicioHistorialChats, ServicioHistorialChats>();

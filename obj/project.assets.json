@@ -6215,24 +6215,25 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\vicen\\.nuget\\packages\\": {}
+    "C:\\Users\\irene\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\vicen\\OneDrive\\Escritorio\\RoadToDevOps\\chatbot\\ChatbotGomarco.csproj",
+      "projectUniqueName": "C:\\Users\\irene\\Desktop\\chatbot\\ChatbotGomarco.csproj",
       "projectName": "ChatbotGomarco",
-      "projectPath": "C:\\Users\\vicen\\OneDrive\\Escritorio\\RoadToDevOps\\chatbot\\ChatbotGomarco.csproj",
-      "packagesPath": "C:\\Users\\vicen\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\vicen\\OneDrive\\Escritorio\\RoadToDevOps\\chatbot\\obj\\",
+      "projectPath": "C:\\Users\\irene\\Desktop\\chatbot\\ChatbotGomarco.csproj",
+      "packagesPath": "C:\\Users\\irene\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\irene\\Desktop\\chatbot\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\vicen\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\irene\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0-windows"
       ],
       "sources": {
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
