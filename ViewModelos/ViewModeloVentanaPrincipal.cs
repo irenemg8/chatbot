@@ -454,49 +454,19 @@ namespace ChatbotGomarco.ViewModelos
         {
             try
             {
-                // Solicitar clave API mediante un cuadro de entrada simple
-                var resultado = Microsoft.VisualBasic.Interaction.InputBox(
-                    "Ingresa tu clave de API de OpenAI para activar la IA avanzada:\n\n" +
-                    "• La clave se mantendrá solo durante esta sesión\n" +
-                    "• Obtenla en: https://platform.openai.com/api-keys\n" +
-                    "• Formato: sk-...",
-                    "🤖 Configurar OpenAI GPT-4",
-                    "");
-
-                if (!string.IsNullOrEmpty(resultado))
-                {
-                    _servicioChatbot.ConfigurarClaveIA(resultado);
-                    ActualizarEstadoIA();
-                    
-                    if (IADisponible)
-                    {
-                        System.Windows.MessageBox.Show(
-                            "🚀 ¡OpenAI GPT-4 activado exitosamente!\n\n" +
-                            "Tu chatbot ahora puede:\n" +
-                            "• Conversar naturalmente con la potencia de GPT-4\n" +
-                            "• Analizar documentos e imágenes con IA avanzada\n" +
-                            "• Generar respuestas inteligentes y contextuales\n" +
-                            "• Mantener conversaciones profundas y complejas",
-                            "OpenAI GPT-4 Configurado",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Information);
-                    }
-                    else
-                    {
-                        System.Windows.MessageBox.Show(
-                            "❌ No se pudo configurar la IA.\n\nPor favor verifica que la clave API sea válida.",
-                            "Error de Configuración",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Warning);
-                    }
-                }
+                // Abrir la ventana de configuración moderna
+                var ventanaConfiguracion = new Vistas.VentanaConfiguracion();
+                ventanaConfiguracion.Owner = System.Windows.Application.Current.MainWindow;
+                ventanaConfiguracion.ShowDialog();
+                
+                // Actualizar el estado de IA después de cerrar la ventana de configuración
+                ActualizarEstadoIA();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al configurar IA");
-                EstadoIA = "Error al configurar IA";
+                _logger.LogError(ex, "Error al abrir ventana de configuración");
                 System.Windows.MessageBox.Show(
-                    $"Error al configurar la IA: {ex.Message}",
+                    $"Error al abrir la configuración: {ex.Message}",
                     "Error",
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);

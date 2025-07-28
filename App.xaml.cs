@@ -4,6 +4,7 @@ using System.Windows;
 using ChatbotGomarco.Servicios;
 using ChatbotGomarco.Datos;
 using ChatbotGomarco.ViewModelos;
+using System;
 
 namespace ChatbotGomarco
 {
@@ -59,6 +60,7 @@ namespace ChatbotGomarco
 
             // ViewModels
             servicios.AddTransient<ViewModeloVentanaPrincipal>();
+            servicios.AddTransient<ViewModeloVentanaConfiguracion>();
 
             _proveedorServicios = servicios.BuildServiceProvider();
         }
@@ -73,6 +75,11 @@ namespace ChatbotGomarco
         public T ObtenerServicio<T>() where T : class
         {
             return _proveedorServicios!.GetRequiredService<T>();
+        }
+
+        public T ObtenerServicio<T>(params object[] parametros) where T : class
+        {
+            return ActivatorUtilities.CreateInstance<T>(_proveedorServicios!, parametros);
         }
 
         protected override void OnExit(ExitEventArgs argumentosSalida)
