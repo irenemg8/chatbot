@@ -257,22 +257,21 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
                     throw new ArgumentException("La API Key no puede estar vacía o contener solo espacios en blanco");
                 }
 
-                // Validación MÍNIMA - Solo verificar que comience con sk- y tenga longitud básica
-                if (!apiKey.StartsWith("sk-"))
+                // CRÍTICO: Limpiar espacios ANTES de las validaciones
+                var claveLimpia = apiKey.Trim();
+
+                // Validación MÍNIMA - Solo verificar que comience con sk- (OpenAI maneja el resto)
+                if (!claveLimpia.StartsWith("sk-"))
                 {
                     _logger.LogWarning("Formato de API Key inválido: no comienza con 'sk-'");
                     throw new ArgumentException("Formato de API Key inválido. Debe comenzar con 'sk-'");
                 }
 
-                if (apiKey.Length < 10)
-                {
-                    _logger.LogWarning("API Key demasiado corta: {Length} caracteres", apiKey.Length);
-                    throw new ArgumentException("La API Key parece ser demasiado corta. Verifica que sea correcta");
-                }
+                // ELIMINADA validación de longitud - OpenAI maneja diferentes formatos y longitudes
 
                 // SIN MÁS VALIDACIONES - OpenAI maneja los formatos internally
 
-                _apiKey = apiKey.Trim();
+                _apiKey = claveLimpia;
                 
                 // Limpiar headers previos de autorización
                 _httpClient.DefaultRequestHeaders.Authorization = null;

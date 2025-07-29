@@ -809,7 +809,6 @@ namespace ChatbotGomarco.ViewModelos
                     $"🚨 {errorMsg}\n\n" +
                     "📝 Formato requerido:\n" +
                     "• Debe comenzar con 'sk-'\n" +
-                    "• Debe tener al menos 10 caracteres\n" +
                     "• Todos los formatos OpenAI son válidos\n" +
                     "• No debe contener espacios extra\n\n" +
                     "🔗 Obtén tu clave en:\n" +

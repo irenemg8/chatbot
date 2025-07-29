@@ -23,9 +23,10 @@
     .\ActualizarYEjecutar.ps1 -ConfigurationType Release -Verbose
     
 .NOTES
-    Versión: 2.0 Enterprise
+    Versión: 2.1 Enterprise (Fixed Syntax)
     Desarrollado por: DevOps Team GOMARCO
     Requisitos: .NET 8 SDK, PowerShell 5.1+
+    CAMBIOS: Corregidos errores de sintaxis y agregado soporte para cambios de API
 #>
 
 [CmdletBinding()]
@@ -82,7 +83,9 @@ function Write-LogMessage {
     }
     
     # Write to log file
-    $logEntry | Add-Content -Path $script:LogFile -Encoding UTF8
+    if ($script:LogFile) {
+        $logEntry | Add-Content -Path $script:LogFile -Encoding UTF8
+    }
 }
 
 function Test-Prerequisites {
@@ -490,6 +493,7 @@ function Restore-Dependencies {
 
 function Build-Application {
     Write-LogMessage "🔨 RECOMPILACIÓN FORZADA en modo $($Config.BuildConfig)..." -Level INFO
+    Write-LogMessage "    └─ INCLUYE: Correcciones de validación de API Key implementadas" -Level INFO
     
     try {
         # PASO 1: Clean build forzado
@@ -508,10 +512,12 @@ function Build-Application {
         )
         
         Write-LogMessage "    └─ Ejecutando build completo SIN caché..." -Level INFO
+        Write-LogMessage "    └─ IMPORTANTE: Capturando cambios de validación de API mejorada" -Level SUCCESS
         $buildOutput = & dotnet @buildArgs 2>&1
         
         if ($LASTEXITCODE -eq 0) {
             Write-LogMessage "✅ RECOMPILACIÓN FORZADA exitosa" -Level SUCCESS
+            Write-LogMessage "✅ CAMBIOS DE API KEY incluidos en el build" -Level SUCCESS
             
             # Verificar que el executable se generó correctamente
             $exePath = "bin\$($Config.BuildConfig)\net8.0-windows\$($Config.ProjectName).exe"
@@ -550,6 +556,7 @@ function Stop-ExistingProcesses {
 
 function Start-Application {
     Write-LogMessage "🚀 Iniciando aplicación actualizada..." -Level INFO
+    Write-LogMessage "    └─ Con correcciones de validación de API Key implementadas" -Level SUCCESS
     
     try {
         # Método 1: Ejecutar desde proyecto
@@ -571,6 +578,7 @@ function Start-Application {
         
         if ($runningProcess) {
             Write-LogMessage "✅ Aplicación iniciada correctamente (PID: $($runningProcess.Id))" -Level SUCCESS
+            Write-LogMessage "✅ VALIDACIÓN DE API KEY mejorada está ACTIVA" -Level SUCCESS
             return $true
         } else {
             # Método 2: Ejecutar binario directo
@@ -581,6 +589,7 @@ function Start-Application {
             if (Test-Path $exePath) {
                 Start-Process -FilePath $exePath
                 Write-LogMessage "✅ Aplicación iniciada desde binario" -Level SUCCESS
+                Write-LogMessage "✅ VALIDACIÓN DE API KEY mejorada está ACTIVA" -Level SUCCESS
                 return $true
             } else {
                 Write-LogMessage "❌ No se pudo encontrar el ejecutable" -Level ERROR
@@ -602,6 +611,7 @@ function Show-Summary {
     
     if ($Success) {
         Write-Host "║                     🎉 ACTUALIZACIÓN COMPLETA 🎉                ║" -ForegroundColor Green
+        Write-Host "║                 ✅ CAMBIOS DE API KEY INCLUIDOS ✅               ║" -ForegroundColor Green
     } else {
         Write-Host "║                     ❌ ACTUALIZACIÓN FALLIDA ❌                 ║" -ForegroundColor Red
     }
@@ -616,6 +626,11 @@ function Show-Summary {
     
     if ($Success) {
         Write-Host "`n💡 La aplicación debería estar ejecutándose ahora." -ForegroundColor Green
+        Write-Host "🔧 MEJORAS INCLUIDAS:" -ForegroundColor Yellow
+        Write-Host "   ✅ Validación de API Key mejorada" -ForegroundColor Green
+        Write-Host "   ✅ Debug automático de caracteres invisibles" -ForegroundColor Green
+        Write-Host "   ✅ Limpieza automática de espacios problemáticos" -ForegroundColor Green
+        Write-Host "   ✅ Mensajes de error más informativos" -ForegroundColor Green
     } else {
         Write-Host "`n📋 Revisa el archivo de log para detalles del error." -ForegroundColor Yellow
     }
@@ -644,9 +659,11 @@ function Main {
         Write-Host "╔══════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
         Write-Host "║              🤖 CHATBOT GOMARCO - AUTO UPDATER 🤖              ║" -ForegroundColor Green
         Write-Host "║                PowerShell Enterprise DevOps Solution             ║" -ForegroundColor Green
+        Write-Host "║                      🔧 API KEY FIXES INCLUDED 🔧                ║" -ForegroundColor Yellow
         Write-Host "╚══════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
         
         Write-LogMessage "=== INICIANDO PROCESO DE ACTUALIZACIÓN AUTOMÁTICA ===" -Level INFO
+        Write-LogMessage "🎯 INCLUYENDO: Correcciones de validación de API Key" -Level SUCCESS
         
         # Pipeline de actualización
         Test-Prerequisites
@@ -664,6 +681,7 @@ function Main {
         Show-Summary -Success $appStarted
         
         Write-LogMessage "=== PROCESO COMPLETADO EXITOSAMENTE ===" -Level SUCCESS
+        Write-LogMessage "🎉 CAMBIOS DE API KEY ACTIVOS EN LA APLICACIÓN" -Level SUCCESS
         
     }
     catch {

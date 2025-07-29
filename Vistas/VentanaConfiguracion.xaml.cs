@@ -219,8 +219,8 @@ namespace ChatbotGomarco.Vistas
         {
             try
             {
-                // Si hay una clave existente, usarla
-                if (!string.IsNullOrEmpty(TextBoxClaveAPI.Tag?.ToString()))
+                // Si hay una clave existente Y el TextBox está ReadOnly, usar la clave guardada
+                if (!string.IsNullOrEmpty(TextBoxClaveAPI.Tag?.ToString()) && TextBoxClaveAPI.IsReadOnly)
                 {
                     ClaveAPI = TextBoxClaveAPI.Tag.ToString();
                     await CambiarProveedorActivoAsync("openai");
@@ -229,8 +229,21 @@ namespace ChatbotGomarco.Vistas
                     Close();
                     return;
                 }
+                
+                // Si el TextBox no está ReadOnly, significa que el usuario quiere cambiar la clave
+                if (!TextBoxClaveAPI.IsReadOnly)
+                {
+                    // Limpiar Tag para usar la nueva clave del TextBox
+                    TextBoxClaveAPI.Tag = null;
+                }
 
                 string claveIngresada = TextBoxClaveAPI.Text?.Trim() ?? string.Empty;
+
+                // DEBUG: Verificar qué se está recibiendo exactamente
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Clave recibida: '{claveIngresada}'");
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Longitud: {claveIngresada.Length}");
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Primeros 10 chars: '{(claveIngresada.Length >= 10 ? claveIngresada.Substring(0, 10) : claveIngresada)}'");
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Comienza con sk-: {claveIngresada.StartsWith("sk-")}");
 
                 // Validaciones básicas para OpenAI
                 if (string.IsNullOrWhiteSpace(claveIngresada))
@@ -241,14 +254,39 @@ namespace ChatbotGomarco.Vistas
                     return;
                 }
 
-                // Validación MÍNIMA - Solo sk- y longitud básica
-                if (!claveIngresada.StartsWith("sk-") || claveIngresada.Length < 10)
+                // VALIDACIÓN TEMPORAL DESHABILITADA PARA DEBUG
+                // Verificar directamente si contiene "sk-" en cualquier posición
+                if (!claveIngresada.Contains("sk-"))
                 {
-                    MessageBox.Show("La clave API debe comenzar con 'sk-' y tener al menos 10 caracteres.\n\nTodos los formatos de OpenAI son válidos:\n• sk-proj-... (nuevo formato)\n• sk-... (formato clásico)\n• sk-org-... (organizaciones)",
-                        "Formato inválido", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show($"DEBUG: No contiene 'sk-' en ninguna posición.\n\nCadena recibida: '{claveIngresada}'\nLongitud: {claveIngresada.Length}\n\nPor favor reporta este error.",
+                        "DEBUG - Error de validación", MessageBoxButton.OK, MessageBoxImage.Error);
                     TextBoxClaveAPI.Focus();
                     TextBoxClaveAPI.SelectAll();
                     return;
+                }
+                
+                // Si contiene "sk-" pero no empieza con "sk-", hay un problema de caracteres invisibles
+                if (!claveIngresada.StartsWith("sk-"))
+                {
+                    MessageBox.Show($"DEBUG: Contiene 'sk-' pero no empieza con 'sk-'.\n\nPrimeros 10 caracteres: '{(claveIngresada.Length >= 10 ? claveIngresada.Substring(0, 10) : claveIngresada)}'\n\nPosiblemente hay caracteres invisibles al inicio.",
+                        "DEBUG - Caracteres invisibles detectados", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    
+                    // Intentar limpiar caracteres invisibles
+                    var claveLimpia = claveIngresada.Trim().Replace("\u200B", "").Replace("\u00A0", " ").Trim();
+                    
+                    if (claveLimpia.StartsWith("sk-"))
+                    {
+                        // Usar la clave limpia
+                        claveIngresada = claveLimpia;
+                        TextBoxClaveAPI.Text = claveLimpia;
+                        MessageBox.Show("✅ Caracteres invisibles eliminados. La clave ahora es válida.", "Problema resuelto", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        TextBoxClaveAPI.Focus();
+                        TextBoxClaveAPI.SelectAll();
+                        return;
+                    }
                 }
 
                 // SIN MÁS VALIDACIONES - Dejamos que OpenAI valide
