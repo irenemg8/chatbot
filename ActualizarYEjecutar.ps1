@@ -141,8 +141,8 @@ function Test-AndInstall-Ollama {
             Install-Ollama
         }
         
-        # Verificar y descargar Phi-4-Mini
-        Ensure-Phi4Mini-Model
+        # Verificar y descargar modelos AI enterprise
+        Ensure-AI-Models
     }
     catch {
         Write-LogMessage "⚠️  Error configurando Ollama - continuando sin IA local" -Level WARN
@@ -248,71 +248,175 @@ function Install-Ollama {
     }
 }
 
-function Ensure-Phi4Mini-Model {
-    Write-LogMessage "🧠 Verificando modelo Phi-4-Mini..." -Level INFO
+function Ensure-AI-Models {
+    Write-LogMessage "🧠 Verificando e instalando modelos AI empresariales..." -Level INFO
+    
+    # 🎯 CONFIGURACIÓN DE MODELOS ENTERPRISE
+    $ModelosRecomendados = @(
+        @{
+            Nombre = "deepseek-r1:7b"
+            Descripcion = "DeepSeek-R1 7B (Razonamiento Avanzado)"
+            Prioridad = 1
+            Categoria = "reasoning"
+        },
+        @{
+            Nombre = "llama3.1-claude:latest"
+            Descripcion = "Llama 3.1 + Claude 3.5 Sonnet"
+            Prioridad = 2
+            Categoria = "conversational"
+        },
+        @{
+            Nombre = "phi3:mini"
+            Descripcion = "Phi-3-Mini (Microsoft - Estable)"
+            Prioridad = 3
+            Categoria = "stable"
+        },
+        @{
+            Nombre = "deepseek-v3:latest"
+            Descripcion = "DeepSeek-V3 (General)"
+            Prioridad = 4
+            Categoria = "general"
+        },
+        @{
+            Nombre = "deepseek_r1-claude:latest"
+            Descripcion = "DeepSeek-R1 + Claude 3.5 Sonnet"
+            Prioridad = 5
+            Categoria = "hybrid"
+        }
+    )
     
     try {
-        # Verificar si Ollama está ejecutándose
+        # ========== PASO 1: VERIFICAR OLLAMA ==========
+        Write-LogMessage "    └─ Verificando estado de Ollama..." -Level INFO
         $ollamaRunning = $false
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:11434/api/version" -TimeoutSec 5 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
                 $ollamaRunning = $true
+                Write-LogMessage "    └─ ✅ Ollama ejecutándose correctamente" -Level SUCCESS
             }
         }
         catch {
-            # Ollama no está ejecutándose
+            Write-LogMessage "    └─ ⚠️ Ollama no está ejecutándose" -Level WARN
         }
         
         if (-not $ollamaRunning) {
-            Write-LogMessage "    └─ Iniciando servicio Ollama..." -Level INFO
-            
-            # Intentar iniciar Ollama en background
+            Write-LogMessage "    └─ 🚀 Iniciando servicio Ollama..." -Level INFO
             try {
                 Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 3
+                Start-Sleep -Seconds 5
+                
+                # Verificar nuevamente
+                $response = Invoke-WebRequest -Uri "http://localhost:11434/api/version" -TimeoutSec 5 -ErrorAction SilentlyContinue
+                if ($response.StatusCode -eq 200) {
+                    Write-LogMessage "    └─ ✅ Ollama iniciado exitosamente" -Level SUCCESS
+                } else {
+                    throw "Ollama no responde después de iniciarlo"
+                }
             }
             catch {
                 Write-LogMessage "⚠️  No se pudo iniciar Ollama automáticamente" -Level WARN
+                Write-LogMessage "    └─ Ejecuta manualmente: ollama serve" -Level INFO
                 return
             }
         }
         
-        # Verificar si phi4-mini está disponible
+        # ========== PASO 2: VERIFICAR MODELOS EXISTENTES ==========
+        Write-LogMessage "    └─ 📋 Verificando modelos instalados..." -Level INFO
+        $modelosInstalados = @()
         try {
             $models = & ollama list 2>$null
-            if ($models -match "phi4.*mini" -or $models -match "phi3.*mini") {
-                Write-LogMessage "✅ Modelo Phi Mini ya disponible" -Level SUCCESS
-                return
+            if ($models) {
+                $modelosInstalados = $models | Where-Object { $_ -and $_.Trim() -ne "" }
+                Write-LogMessage "    └─ Modelos encontrados: $($modelosInstalados.Count)" -Level INFO
             }
         }
         catch {
-            Write-LogMessage "⚠️  No se pudo verificar modelos de Ollama" -Level WARN
-            return
+            Write-LogMessage "⚠️  No se pudo listar modelos existentes" -Level WARN
         }
         
-        # Descargar phi3:mini como alternativa confiable
-        Write-LogMessage "📥 Descargando modelo Phi-3-Mini (recomendado)..." -Level INFO
-        Write-LogMessage "    Este proceso puede tardar varios minutos dependiendo de tu conexión" -Level INFO
+        # ========== PASO 3: ESTRATEGIA DE INSTALACIÓN INTELIGENTE ==========
+        $modelosPorInstalar = @()
+        $hayModeloRecomendado = $false
         
+        foreach ($modelo in $ModelosRecomendados) {
+            $modeloNombre = $modelo.Nombre
+            $yaInstalado = $modelosInstalados | Where-Object { $_ -match [regex]::Escape($modeloNombre.Split(':')[0]) }
+            
+            if ($yaInstalado) {
+                Write-LogMessage "    └─ ✅ $($modelo.Descripcion) ya está instalado" -Level SUCCESS
+                $hayModeloRecomendado = $true
+            } else {
+                $modelosPorInstalar += $modelo
+            }
+        }
+        
+        # Si ya hay al menos un modelo recomendado, solo instalar uno adicional de máxima prioridad
+        if ($hayModeloRecomendado) {
+            Write-LogMessage "✅ SISTEMA YA OPERATIVO - Al menos un modelo enterprise disponible" -Level SUCCESS
+            
+            # Instalar solo el modelo de mayor prioridad que falte
+            $proximoModelo = $modelosPorInstalar | Sort-Object Prioridad | Select-Object -First 1
+            if ($proximoModelo) {
+                Write-LogMessage "🎯 Instalando modelo adicional de alta prioridad..." -Level INFO
+                Install-Single-Model -ModelConfig $proximoModelo
+            }
+        } else {
+            # No hay modelos, instalar al menos los 2 más importantes
+            Write-LogMessage "🚀 CONFIGURACIÓN INICIAL - Instalando modelos esenciales..." -Level INFO
+            
+            $modelosEsenciales = $modelosPorInstalar | Sort-Object Prioridad | Select-Object -First 2
+            foreach ($modelo in $modelosEsenciales) {
+                Install-Single-Model -ModelConfig $modelo
+            }
+        }
+        
+        Write-LogMessage "✅ CONFIGURACIÓN DE MODELOS COMPLETADA" -Level SUCCESS
+        Write-LogMessage "    └─ El chatbot está listo para operar con IA avanzada" -Level SUCCESS
+        
+    }
+    catch {
+        Write-LogMessage "⚠️  Error en configuración de modelos: $($_.Exception.Message)" -Level WARN
+        Write-LogMessage "    └─ Intentando instalación de respaldo (phi3:mini)..." -Level WARN
+        
+        # Respaldo: instalar phi3:mini como mínimo
         try {
             $pullProcess = Start-Process -FilePath "ollama" -ArgumentList "pull", "phi3:mini" -Wait -PassThru -NoNewWindow
-            
             if ($pullProcess.ExitCode -eq 0) {
-                Write-LogMessage "✅ Modelo Phi-3-Mini descargado exitosamente" -Level SUCCESS
-                Write-LogMessage "    El chatbot ahora puede funcionar completamente offline" -Level SUCCESS
-            } else {
-                Write-LogMessage "⚠️  Descarga de modelo falló - se puede intentar manualmente" -Level WARN
-                Write-LogMessage "    Comando: ollama pull phi3:mini" -Level INFO
+                Write-LogMessage "✅ Modelo de respaldo (Phi-3-Mini) instalado" -Level SUCCESS
             }
         }
         catch {
-            Write-LogMessage "⚠️  Error descargando modelo: $($_.Exception.Message)" -Level WARN
-            Write-LogMessage "    Puedes descargarlo manualmente: ollama pull phi3:mini" -Level INFO
+            Write-LogMessage "❌ Error crítico: No se pudo instalar ningún modelo" -Level ERROR
+            Write-LogMessage "    └─ Instala manualmente: ollama pull phi3:mini" -Level ERROR
+        }
+    }
+}
+
+function Install-Single-Model {
+    param([hashtable]$ModelConfig)
+    
+    $nombre = $ModelConfig.Nombre
+    $descripcion = $ModelConfig.Descripcion
+    
+    Write-LogMessage "📥 Descargando $descripcion..." -Level INFO
+    Write-LogMessage "    └─ Modelo: $nombre" -Level INFO
+    Write-LogMessage "    └─ Este proceso puede tardar varios minutos..." -Level INFO
+    
+    try {
+        $pullProcess = Start-Process -FilePath "ollama" -ArgumentList "pull", $nombre -Wait -PassThru -NoNewWindow
+        
+        if ($pullProcess.ExitCode -eq 0) {
+            Write-LogMessage "✅ $descripcion descargado exitosamente" -Level SUCCESS
+            Write-LogMessage "    └─ Modelo disponible para el chatbot" -Level SUCCESS
+        } else {
+            Write-LogMessage "⚠️  Descarga de $descripcion falló" -Level WARN
+            Write-LogMessage "    └─ Comando manual: ollama pull $nombre" -Level INFO
         }
     }
     catch {
-        Write-LogMessage "⚠️  Error configurando modelo Phi: $($_.Exception.Message)" -Level WARN
+        Write-LogMessage "⚠️  Error descargando $descripcion`: $($_.Exception.Message)" -Level WARN
+        Write-LogMessage "    └─ Comando manual: ollama pull $nombre" -Level INFO
     }
 }
 
@@ -631,6 +735,13 @@ function Show-Summary {
         Write-Host "   ✅ Debug automático de caracteres invisibles" -ForegroundColor Green
         Write-Host "   ✅ Limpieza automática de espacios problemáticos" -ForegroundColor Green
         Write-Host "   ✅ Mensajes de error más informativos" -ForegroundColor Green
+        Write-Host "" -ForegroundColor Green
+        Write-Host "🧠 MODELOS AI ENTERPRISE DISPONIBLES:" -ForegroundColor Cyan
+        Write-Host "   🚀 DeepSeek-R1 7B (Razonamiento Avanzado)" -ForegroundColor Green
+        Write-Host "   🦙 Llama 3.1 + Claude 3.5 Sonnet (Conversacional)" -ForegroundColor Green
+        Write-Host "   🧠 DeepSeek-R1 + Claude (Razonamiento + Conversación)" -ForegroundColor Green
+        Write-Host "   ⚡ DeepSeek-V3 (General Purpose)" -ForegroundColor Green
+        Write-Host "   🔧 Phi-3-Mini (Microsoft - Estable)" -ForegroundColor Green
     } else {
         Write-Host "`n📋 Revisa el archivo de log para detalles del error." -ForegroundColor Yellow
     }
@@ -659,11 +770,13 @@ function Main {
         Write-Host "╔══════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
         Write-Host "║              🤖 CHATBOT GOMARCO - AUTO UPDATER 🤖              ║" -ForegroundColor Green
         Write-Host "║                PowerShell Enterprise DevOps Solution             ║" -ForegroundColor Green
+        Write-Host "║            🧠 DEEPSEEK + CLAUDE + PHI MODELS INCLUDED 🧠        ║" -ForegroundColor Cyan
         Write-Host "║                      🔧 API KEY FIXES INCLUDED 🔧                ║" -ForegroundColor Yellow
         Write-Host "╚══════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
         
         Write-LogMessage "=== INICIANDO PROCESO DE ACTUALIZACIÓN AUTOMÁTICA ===" -Level INFO
         Write-LogMessage "🎯 INCLUYENDO: Correcciones de validación de API Key" -Level SUCCESS
+        Write-LogMessage "🧠 INCLUYENDO: Modelos DeepSeek, Claude-style y Phi" -Level SUCCESS
         
         # Pipeline de actualización
         Test-Prerequisites

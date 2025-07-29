@@ -13,6 +13,7 @@
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -36,75 +37,131 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Contenido Principal con Pestañas Multi-Proveedor -->
-        <TabControl Grid.Row="1" 
-                    x:Name="TabControlProveedores"
-                    SelectionChanged="TabControlProveedores_SelectionChanged"
-                    Background="White"
-                    BorderBrush="#E5E7EB"
-                    BorderThickness="1"
-                    Margin="0">
-            <TabControl.Resources>
-                <Style TargetType="TabItem">
-                    <Setter Property="Padding" Value="16,8"/>
-                    <Setter Property="FontSize" Value="12"/>
-                    <Setter Property="FontWeight" Value="Medium"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="BorderThickness" Value="0"/>
-                    <Setter Property="Margin" Value="0,0,0,0"/>
-                    <Style.Triggers>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="#F3F4F6"/>
-                            <Setter Property="Foreground" Value="#1F2937"/>
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="False">
-                            <Setter Property="Foreground" Value="#6B7280"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </TabControl.Resources>
+        <!-- Indicador del modelo actualmente cargado -->
+        <Border Background="#F0F9FF" CornerRadius="6" Padding="12,8" Margin="0,8,0,12" 
+                BorderBrush="#0EA5E9" BorderThickness="1" Grid.Row="1">
+            <StackPanel Orientation="Horizontal">
+                <materialDesign:PackIcon Kind="Information" Width="16" Height="16" 
+                                         Foreground="#0284C7" VerticalAlignment="Center"/>
+                <TextBlock Text="Modelo Activo:" FontSize="12" FontWeight="Medium" 
+                           Foreground="#0C4A6E" Margin="8,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="TextoModeloActivo" Text="No configurado" 
+                           FontSize="12" FontWeight="Bold" Foreground="#0284C7" 
+                           VerticalAlignment="Center"/>
+                <materialDesign:PackIcon x:Name="IconoModeloActivo" Kind="CheckCircle" 
+                                         Width="14" Height="14" Foreground="#10B981" 
+                                         Margin="8,0,0,0" VerticalAlignment="Center" 
+                                         Visibility="Collapsed"/>
+            </StackPanel>
+        </Border>
 
-            <!-- Pestaña OpenAI -->
-            <TabItem x:Name="TabOpenAI">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Robot" Width="14" Height="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="OpenAI (GPT-4)" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                        <Ellipse x:Name="StatusOpenAI" Width="8" Height="8" Margin="8,0,0,0" 
-                                Fill="#F59E0B" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
+        <!-- Selector de Modelo Elegante -->
+        <StackPanel Grid.Row="2" Margin="0">
+            
+            <!-- Selector de Proveedor IA -->
+            <StackPanel Margin="0,0,0,16">
+                <TextBlock Text="Seleccionar Modelo de IA" 
+                           FontSize="14" FontWeight="Medium" 
+                           Foreground="#1F2937" Margin="0,0,0,8"/>
                 
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="16">
-                        <!-- Estado OpenAI -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <ComboBox x:Name="ComboModelos"
+                          SelectionChanged="ComboModelos_SelectionChanged"
+                          FontSize="13"
+                          Padding="12,10"
+                          Background="White"
+                          BorderBrush="#D1D5DB"
+                          BorderThickness="1"
+                          Height="44"
+                          VerticalContentAlignment="Center">
+                    
+                    <ComboBoxItem x:Name="ItemOpenAI" Tag="openai">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Robot" Width="16" Height="16" 
+                                                     Foreground="#059669" VerticalAlignment="Center"/>
+                            <StackPanel Margin="10,0,0,0">
+                                <TextBlock Text="OpenAI GPT-4 Turbo" FontWeight="Medium" FontSize="13"/>
+                                <TextBlock Text="API Externa • Modelo más avanzado • Requiere internet" 
+                                           FontSize="11" Foreground="#6B7280"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ComboBoxItem>
+                    
+                    <ComboBoxItem x:Name="ItemOllama" Tag="ollama">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Brain" Width="16" Height="16" 
+                                                     Foreground="#0284C7" VerticalAlignment="Center"/>
+                            <StackPanel Margin="10,0,0,0">
+                                <TextBlock Text="Ollama (Modelos Locales)" FontWeight="Medium" FontSize="13"/>
+                                <TextBlock Text="100% Privado • Sin internet • Phi-4-Mini y DeepSeek disponibles" 
+                                           FontSize="11" Foreground="#6B7280"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ComboBoxItem>
+                    
+                    <ComboBoxItem x:Name="ItemDeepSeek" Tag="deepseek">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Rocket" Width="16" Height="16" 
+                                                     Foreground="#8B5CF6" VerticalAlignment="Center"/>
+                            <StackPanel Margin="10,0,0,0">
+                                <TextBlock Text="DeepSeek-R1 (Razonamiento)" FontWeight="Medium" FontSize="13"/>
+                                <TextBlock Text="Modelo avanzado • Razonamiento paso a paso • 100% offline" 
+                                           FontSize="11" Foreground="#6B7280"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ComboBoxItem>
+                    
+                    <ComboBoxItem x:Name="ItemClaude" Tag="claude">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="AutoAwesome" Width="16" Height="16" 
+                                                     Foreground="#F59E0B" VerticalAlignment="Center"/>
+                            <StackPanel Margin="10,0,0,0">
+                                <TextBlock Text="Claude-Style Llama" FontWeight="Medium" FontSize="13"/>
+                                <TextBlock Text="Conversación natural • Estilo Anthropic • Modelo local" 
+                                           FontSize="11" Foreground="#6B7280"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ComboBoxItem>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Área de Configuración Dinámica -->
+            <Border Background="#F9FAFB" CornerRadius="8" Padding="20" 
+                    BorderBrush="#E5E7EB" BorderThickness="1">
+                
+                <!-- Contenedor principal para todos los paneles de configuración -->
+                <StackPanel>
+                    <!-- Configuración para OpenAI -->
+                    <StackPanel x:Name="PanelConfigOpenAI" Visibility="Visible">
+                    
+                    <!-- Estado OpenAI -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <materialDesign:PackIcon x:Name="IconoEstado"
                                                  Kind="AlertCircle" 
-                                                 Width="14" Height="14"
+                                                 Width="16" Height="16"
                                                  Foreground="#F59E0B"
                                                  VerticalAlignment="Center"/>
                         <TextBlock x:Name="TextoEstado"
                                    Text="IA no configurada" 
-                                   FontSize="12"
+                                   FontSize="13"
                                    Foreground="#F59E0B"
-                                   Margin="6,0,0,0"
+                                   Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Campo clave API -->
-                    <StackPanel Margin="0,0,0,12">
+                    <StackPanel Margin="0,0,0,16">
                         <TextBlock Text="Clave API de OpenAI (comienza con 'sk-')" 
-                                   FontSize="12"
-                                   Foreground="#4B5563"
-                                   Margin="0,0,0,4"/>
+                                   FontSize="13"
+                                   Foreground="#374151"
+                                   FontWeight="Medium"
+                                   Margin="0,0,0,6"/>
                         <TextBox x:Name="TextBoxClaveAPI"
-                                 FontSize="11"
-                                 Padding="8"
+                                 FontSize="12"
+                                 Padding="12"
                                  Background="White"
                                  BorderBrush="#D1D5DB"
                                  BorderThickness="1"
-                                 Height="32"
+                                 Height="40"
                                  VerticalContentAlignment="Center"
                                  FontFamily="Courier New"
                                  Text=""
@@ -112,173 +169,110 @@
                     </StackPanel>
                     
                     <!-- Link de ayuda -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
                         <materialDesign:PackIcon Kind="OpenInNew" 
-                                                 Width="12" Height="12"
+                                                 Width="14" Height="14"
                                                  Foreground="#6B7280"
                                                  VerticalAlignment="Center"/>
                         <TextBlock Text="Obtén tu clave API en: " 
-                                   FontSize="11"
+                                   FontSize="12"
                                    Foreground="#6B7280"
-                                   Margin="4,0,0,0"
+                                   Margin="6,0,0,0"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="https://platform.openai.com/api-keys" 
-                                   FontSize="11"
+                                   FontSize="12"
                                    Foreground="#3B82F6"
                                    TextDecorations="Underline"
                                    Cursor="Hand"
                                    Margin="0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
-                    
-                    <!-- Información del proveedor OpenAI -->
-                    <Border Background="#F9FAFB" CornerRadius="6" Padding="12" Margin="0,12,0,0">
-                        <StackPanel>
-                            <TextBlock Text="✨ OpenAI GPT-4" FontWeight="Bold" FontSize="13" Foreground="#1F2937" Margin="0,0,0,6"/>
-                            <TextBlock Text="Capacidades:" FontWeight="Medium" FontSize="11" Foreground="#374151" Margin="0,0,0,4"/>
-                            <TextBlock Text="• Requiere API Key y conexión a internet" FontSize="11" Foreground="#6B7280" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Procesamiento en la nube con máxima calidad" FontSize="11" Foreground="#6B7280" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Ideal para análisis complejos y conversaciones avanzadas" FontSize="11" Foreground="#6B7280" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Soporte multimodal (texto, imágenes, código)" FontSize="11" Foreground="#6B7280" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Actualizaciones constantes y mejoras automáticas" FontSize="11" Foreground="#6B7280" Margin="12,0,0,6"/>
-                            
-                            <TextBlock Text="Ideal para:" FontWeight="Medium" FontSize="11" Foreground="#059669" Margin="0,0,0,4"/>
-                            <TextBlock Text="Análisis de documentos complejos, generación de código, tareas que requieren máxima precisión" 
-                                       FontSize="10" Foreground="#059669" Margin="12,0,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
+                </StackPanel>
 
-            <!-- Pestaña Ollama -->
-            <TabItem x:Name="TabOllama">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Brain" Width="14" Height="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="Ollama (Local)" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                        <Ellipse x:Name="StatusOllama" Width="8" Height="8" Margin="8,0,0,0" 
-                                Fill="#F59E0B" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="16">
-                        <!-- Estado Ollama -->
+                <!-- Configuración para Ollama -->
+                <StackPanel x:Name="PanelConfigOllama" Visibility="Collapsed">
+                    
+                    <!-- Estado Ollama -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <materialDesign:PackIcon x:Name="IconoEstadoOllama"
                                                  Kind="AlertCircle" 
-                                                 Width="14" Height="14"
+                                                 Width="16" Height="16"
                                                  Foreground="#F59E0B"
                                                  VerticalAlignment="Center"/>
                         <TextBlock x:Name="TextoEstadoOllama"
                                    Text="Verificando instalación..." 
-                                   FontSize="12"
+                                   FontSize="13"
                                    Foreground="#F59E0B"
-                                   Margin="6,0,0,0"
+                                   Margin="8,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Información del modelo disponible -->
                     <StackPanel x:Name="PanelModeloInfo" Margin="0,0,0,12" Visibility="Collapsed">
-                        <Border Background="#EBF8FF" CornerRadius="4" Padding="8" BorderBrush="#3B82F6" BorderThickness="1">
+                        <Border Background="#EBF8FF" CornerRadius="6" Padding="12" BorderBrush="#3B82F6" BorderThickness="1">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <materialDesign:PackIcon Kind="CheckCircle" Width="14" Height="14" 
+                                    <materialDesign:PackIcon Kind="CheckCircle" Width="16" Height="16" 
                                                              Foreground="#10B981" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Modelo Local Disponible" FontWeight="Medium" FontSize="11" 
-                                               Foreground="#1F2937" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Modelo Local Disponible" FontWeight="Medium" FontSize="13" 
+                                               Foreground="#1F2937" Margin="8,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock x:Name="TextModeloDetectado" Text="Phi-3-Mini (Microsoft)" 
-                                           FontSize="12" FontWeight="Medium" Foreground="#059669" Margin="0,2,0,0"/>
+                                           FontSize="13" FontWeight="Medium" Foreground="#059669" Margin="0,4,0,0"/>
                                 <TextBlock Text="• 100% offline y privado • 2.2GB • Optimizado para Windows" 
-                                           FontSize="10" Foreground="#6B7280" Margin="0,2,0,0"/>
+                                           FontSize="11" Foreground="#6B7280" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                     
-                    <!-- Botones de acción para Ollama -->
-                    <StackPanel x:Name="PanelAccionesOllama" Orientation="Horizontal" Margin="0,0,0,12" Visibility="Collapsed">
-                        <Button x:Name="BotonInstalarOllama"
-                                Content="Instalar Ollama"
-                                Background="#3B82F6"
-                                Foreground="White"
-                                BorderThickness="0"
-                                Padding="8,4"
-                                FontSize="11"
-                                Margin="0,0,8,0"
-                                Click="BotonInstalarOllama_Click"/>
-                        <Button x:Name="BotonDescargarModelo"
-                                Content="Descargar Phi-3-Mini"
-                                Background="#10B981"
-                                Foreground="White"
-                                BorderThickness="0"
-                                Padding="8,4"
-                                FontSize="11"
-                                Click="BotonDescargarModelo_Click"/>
+                    <!-- Información adicional de Ollama -->
+                    <TextBlock Text="🔒 Completamente privado • No requiere internet • Datos seguros"
+                               FontSize="12" Foreground="#059669" 
+                               FontWeight="Medium" TextAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Configuración para DeepSeek -->
+                <StackPanel x:Name="PanelConfigDeepSeek" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <materialDesign:PackIcon Kind="Rocket" Width="16" Height="16" 
+                                                 Foreground="#8B5CF6" VerticalAlignment="Center"/>
+                        <TextBlock Text="DeepSeek-R1 7B - Modelo de Razonamiento Avanzado" 
+                                   FontSize="13" FontWeight="Medium" Foreground="#1F2937" 
+                                   Margin="8,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <!-- Información del proveedor Ollama -->
-                    <Border Background="#F0FDF4" CornerRadius="6" Padding="12" Margin="0,12,0,0">
-                        <StackPanel>
-                            <TextBlock Text="🧠 Ollama + Phi-3-Mini (Local)" FontWeight="Bold" FontSize="13" Foreground="#1F2937" Margin="0,0,0,6"/>
-                            <TextBlock Text="Ventajas de Seguridad:" FontWeight="Medium" FontSize="11" Foreground="#059669" Margin="0,0,0,4"/>
-                            <TextBlock Text="• No requiere API Key - 100% offline" FontSize="11" Foreground="#059669" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Procesamiento local con zero data leakage" FontSize="11" Foreground="#059669" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Ideal para datos sensibles y privacidad total" FontSize="11" Foreground="#059669" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Sin límites de uso ni costos por token" FontSize="11" Foreground="#059669" Margin="12,0,0,6"/>
-                            
-                            <TextBlock Text="Especificaciones:" FontWeight="Medium" FontSize="11" Foreground="#374151" Margin="0,0,0,4"/>
-                            <TextBlock Text="• Modelo Microsoft Phi-3-Mini (3.8B parámetros)" FontSize="11" Foreground="#6B7280" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Tamaño: ~2.2GB (optimizado para Windows)" FontSize="11" Foreground="#6B7280" Margin="12,0,0,2"/>
-                            <TextBlock Text="• Contexto: 128K tokens (documentos largos)" FontSize="11" Foreground="#6B7280" Margin="12,0,0,6"/>
-                            
-                            <TextBlock Text="Ideal para:" FontWeight="Medium" FontSize="11" Foreground="#DC2626" Margin="0,0,0,4"/>
-                            <TextBlock Text="Datos confidenciales, documentos internos, análisis que requieren máxima privacidad empresarial" 
-                                       FontSize="10" Foreground="#DC2626" Margin="12,0,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Pestaña DeepSeek (Próximamente) -->
-            <TabItem x:Name="TabDeepSeek" Visibility="Collapsed">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Rocket" Width="14" Height="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="DeepSeek (Próximamente)" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                        <Ellipse x:Name="StatusDeepSeek" Width="8" Height="8" Margin="8,0,0,0" 
-                                Fill="#6B7280" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </TabItem.Header>
-                
-                <StackPanel Margin="16">
-                    <TextBlock Text="🚀 Próximamente disponible" FontSize="14" FontWeight="Medium" Margin="0,20,0,10"/>
-                    <TextBlock Text="DeepSeek será integrado en futuras versiones" FontSize="12" Foreground="#6B7280"/>
+                    <TextBlock Text="• Razonamiento paso a paso como O1/Gemini 2.5 Pro"
+                               FontSize="12" Foreground="#6B7280" Margin="0,0,0,4"/>
+                    <TextBlock Text="• Ideal para matemáticas, lógica y análisis profundo" 
+                               FontSize="12" Foreground="#6B7280" Margin="0,0,0,4"/>
+                    <TextBlock Text="• 100% offline, privado y sin límites de uso"
+                               FontSize="12" Foreground="#059669" FontWeight="Medium" Margin="0,4,0,0"/>
                 </StackPanel>
-            </TabItem>
 
-            <!-- Pestaña Claude (Próximamente) -->
-            <TabItem x:Name="TabClaude" Visibility="Collapsed">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="AutoAwesome" Width="14" Height="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="Claude (Próximamente)" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                        <Ellipse x:Name="StatusClaude" Width="8" Height="8" Margin="8,0,0,0" 
-                                Fill="#6B7280" VerticalAlignment="Center"/>
+                <!-- Configuración para Claude -->
+                <StackPanel x:Name="PanelConfigClaude" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <materialDesign:PackIcon Kind="AutoAwesome" Width="16" Height="16" 
+                                                 Foreground="#F59E0B" VerticalAlignment="Center"/>
+                        <TextBlock Text="Claude-Style Llama - Conversación Natural" 
+                                   FontSize="13" FontWeight="Medium" Foreground="#1F2937" 
+                                   Margin="8,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
-                </TabItem.Header>
-                
-                <StackPanel Margin="16">
-                    <TextBlock Text="🎯 Próximamente disponible" FontSize="14" FontWeight="Medium" Margin="0,20,0,10"/>
-                    <TextBlock Text="Claude será integrado en futuras versiones" FontSize="12" Foreground="#6B7280"/>
+                    
+                    <TextBlock Text="• Personalidad Claude 3.5 Sonnet en modelo local"
+                               FontSize="12" Foreground="#6B7280" Margin="0,0,0,4"/>
+                    <TextBlock Text="• Conversación natural y filosófica estilo Anthropic" 
+                               FontSize="12" Foreground="#6B7280" Margin="0,0,0,4"/>
+                    <TextBlock Text="• Escritura, conversación y análisis filosófico"
+                               FontSize="12" Foreground="#059669" FontWeight="Medium" Margin="0,4,0,0"/>
                 </StackPanel>
-            </TabItem>
-        </TabControl>
+                
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <!-- Botones de acción -->
-        <StackPanel Grid.Row="2" 
+        <StackPanel Grid.Row="3" 
                     Orientation="Horizontal" 
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">

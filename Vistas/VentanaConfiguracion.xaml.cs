@@ -99,14 +99,22 @@ namespace ChatbotGomarco.Vistas
                 var proveedorActivo = _factoryProveedorIA.ObtenerIdProveedorActivo();
                 ProveedorSeleccionado = proveedorActivo;
                 
-                // Seleccionar pestaña correcta
+                // Seleccionar modelo correcto en el ComboBox
                 if (proveedorActivo == "ollama")
                 {
-                    TabControlProveedores.SelectedItem = TabOllama;
+                    ComboModelos.SelectedItem = ItemOllama;
+                }
+                else if (proveedorActivo == "deepseek")
+                {
+                    ComboModelos.SelectedItem = ItemDeepSeek;
+                }
+                else if (proveedorActivo == "claude")
+                {
+                    ComboModelos.SelectedItem = ItemClaude;
                 }
                 else
                 {
-                    TabControlProveedores.SelectedItem = TabOpenAI;
+                    ComboModelos.SelectedItem = ItemOpenAI;
                 }
                 
                 // Verificar estado de todos los proveedores
@@ -118,13 +126,16 @@ namespace ChatbotGomarco.Vistas
                 // Configurar proveedores futuros
                 ConfigurarProveedoresFuturos();
                 
+                // Inicializar indicador del modelo activo
+                ActualizarIndicadorModeloActivo();
+                
                 TextBoxClaveAPI.Focus();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error inicializando ventana: {ex.Message}");
                 // Continuar con inicialización básica
-                TabControlProveedores.SelectedItem = TabOpenAI;
+                ComboModelos.SelectedItem = ItemOpenAI;
                 TextBoxClaveAPI.Focus();
             }
         }
@@ -452,14 +463,13 @@ namespace ChatbotGomarco.Vistas
             {
                 if (idProveedor == "openai")
                 {
-                    // Actualizar estado de OpenAI
+                    // Actualizar estado de OpenAI en el panel correspondiente
                     if (estado.EstaDisponible)
                     {
                         IconoEstado.Kind = PackIconKind.CheckCircle;
                         IconoEstado.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
                         TextoEstado.Text = "OpenAI configurado y funcionando";
                         TextoEstado.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
-                        StatusOpenAI.Fill = new SolidColorBrush(Color.FromRgb(16, 185, 129));
                     }
                     else
                     {
@@ -467,19 +477,17 @@ namespace ChatbotGomarco.Vistas
                         IconoEstado.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
                         TextoEstado.Text = estado.MensajeEstado;
                         TextoEstado.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
-                        StatusOpenAI.Fill = new SolidColorBrush(Color.FromRgb(245, 158, 11));
                     }
                 }
                 else if (idProveedor == "ollama")
                 {
-                    // Actualizar estado de Ollama
+                    // Actualizar estado de Ollama en el panel correspondiente
                     if (estado.EstaDisponible)
                     {
                         IconoEstadoOllama.Kind = PackIconKind.CheckCircle;
                         IconoEstadoOllama.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
                         TextoEstadoOllama.Text = estado.MensajeEstado;
                         TextoEstadoOllama.Foreground = new SolidColorBrush(Color.FromRgb(16, 185, 129));
-                        StatusOllama.Fill = new SolidColorBrush(Color.FromRgb(16, 185, 129));
                     }
                     else
                     {
@@ -487,7 +495,6 @@ namespace ChatbotGomarco.Vistas
                         IconoEstadoOllama.Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68));
                         TextoEstadoOllama.Text = estado.MensajeEstado;
                         TextoEstadoOllama.Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68));
-                        StatusOllama.Fill = new SolidColorBrush(Color.FromRgb(239, 68, 68));
                     }
                 }
                 
@@ -511,26 +518,14 @@ namespace ChatbotGomarco.Vistas
                 {
                     // Ollama está disponible - mostrar información del modelo
                     PanelModeloInfo.Visibility = Visibility.Visible;
-                    PanelAccionesOllama.Visibility = Visibility.Collapsed;
                     
                     // Mostrar información del modelo detectado
                     ActualizarInfoModeloDetectado(estado);
                 }
-                else if (estado.RequiereInstalacion)
-                {
-                    // Ollama no está instalado - mostrar botón de instalación
-                    PanelModeloInfo.Visibility = Visibility.Collapsed;
-                    PanelAccionesOllama.Visibility = Visibility.Visible;
-                    BotonInstalarOllama.Visibility = Visibility.Visible;
-                    BotonDescargarModelo.Visibility = Visibility.Collapsed;
-                }
                 else
                 {
-                    // Ollama instalado pero sin modelos - mostrar botón de descarga
+                    // Ollama no está disponible - ocultar información del modelo
                     PanelModeloInfo.Visibility = Visibility.Collapsed;
-                    PanelAccionesOllama.Visibility = Visibility.Visible;
-                    BotonInstalarOllama.Visibility = Visibility.Collapsed;
-                    BotonDescargarModelo.Visibility = Visibility.Visible;
                 }
             }
             catch (Exception ex)
@@ -580,160 +575,239 @@ namespace ChatbotGomarco.Vistas
         // ====================================================================
 
         /// <summary>
-        /// Maneja el cambio de pestaña de proveedor
+        /// Maneja el cambio en el ComboBox de selección de modelos
         /// </summary>
-        private async void TabControlProveedores_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void ComboModelos_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
             {
-                if (e.Source != TabControlProveedores) return;
-                
-                var tabSeleccionada = TabControlProveedores.SelectedItem as TabItem;
-                if (tabSeleccionada == TabOpenAI)
+                var itemSeleccionado = ComboModelos.SelectedItem as ComboBoxItem;
+                if (itemSeleccionado?.Tag != null)
                 {
-                    ProveedorSeleccionado = "openai";
-                }
-                else if (tabSeleccionada == TabOllama)
-                {
-                    ProveedorSeleccionado = "ollama";
-                }
-                
-                // Actualizar texto del botón según el proveedor
-                ActualizarTextoBotonGuardar();
-                
-                // Actualizar título dinámico
-                ActualizarTituloVentana();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error cambiando pestaña: {ex.Message}");
-            }
-        }
-
-
-
-        /// <summary>
-        /// Maneja el click del botón Instalar Ollama
-        /// </summary>
-        private async void BotonInstalarOllama_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var resultado = MessageBox.Show(
-                    "¿Deseas instalar Ollama para IA local?\n\n" +
-                    "• Se descargará e instalará automáticamente\n" +
-                    "• Permite procesamiento 100% offline\n" +
-                    "• Ideal para datos sensibles\n\n" +
-                    "El proceso puede tardar unos minutos.",
-                    "Instalar Ollama", 
-                    MessageBoxButton.YesNo, 
-                    MessageBoxImage.Question);
-
-                if (resultado == MessageBoxResult.Yes)
-                {
-                    // Ejecutar script de instalación
-                    var psi = new ProcessStartInfo
+                    ProveedorSeleccionado = itemSeleccionado.Tag.ToString();
+                    
+                    // Ocultar todos los paneles de configuración
+                    PanelConfigOpenAI.Visibility = Visibility.Collapsed;
+                    PanelConfigOllama.Visibility = Visibility.Collapsed;
+                    PanelConfigDeepSeek.Visibility = Visibility.Collapsed;
+                    PanelConfigClaude.Visibility = Visibility.Collapsed;
+                    
+                    // Mostrar el panel correspondiente al modelo seleccionado
+                    switch (ProveedorSeleccionado?.ToLower())
                     {
-                        FileName = "powershell.exe",
-                        Arguments = "-ExecutionPolicy Bypass -File .\\ActualizarYEjecutar.ps1 -SkipGitPull",
-                        UseShellExecute = true,
-                        Verb = "runas" // Ejecutar como administrador
-                    };
+                        case "openai":
+                            PanelConfigOpenAI.Visibility = Visibility.Visible;
+                            break;
+                        case "ollama":
+                            PanelConfigOllama.Visibility = Visibility.Visible;
+                            break;
+                        case "deepseek":
+                            PanelConfigDeepSeek.Visibility = Visibility.Visible;
+                            break;
+                        case "claude":
+                            PanelConfigClaude.Visibility = Visibility.Visible;
+                            break;
+                    }
                     
-                    Process.Start(psi);
+                    // Actualizar texto del botón según el proveedor
+                    ActualizarTextoBotonGuardar();
                     
-                    MessageBox.Show(
-                        "Se ha iniciado la instalación de Ollama.\n\n" +
-                        "El script se ejecutará en una ventana separada.\n" +
-                        "Cierra esta ventana y vuelve a abrirla cuando termine la instalación.",
-                        "Instalación en Progreso",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    // Actualizar indicador del modelo activo
+                    ActualizarIndicadorModeloActivo();
                     
-                    Close();
+                    // Actualizar título dinámico
+                    ActualizarTituloVentana();
+                    
+                    Debug.WriteLine($"Modelo seleccionado: {ProveedorSeleccionado}");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error iniciando instalación:\n\n{ex.Message}", 
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Debug.WriteLine($"Error cambiando modelo: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Maneja el click del botón Descargar Modelo
-        /// </summary>
-        private async void BotonDescargarModelo_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var resultado = MessageBox.Show(
-                    "¿Deseas descargar el modelo Phi-3-Mini?\n\n" +
-                    "• Tamaño: ~2.2GB\n" +
-                    "• Modelo Microsoft optimizado\n" +
-                    "• Requiere Ollama instalado\n\n" +
-                    "La descarga puede tardar varios minutos según tu conexión.",
-                    "Descargar Modelo", 
-                    MessageBoxButton.YesNo, 
-                    MessageBoxImage.Question);
 
-                if (resultado == MessageBoxResult.Yes)
-                {
-                    // Ejecutar comando ollama pull
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = "/k ollama pull phi3:mini",
-                        UseShellExecute = true
-                    };
-                    
-                    Process.Start(psi);
-                    
-                    MessageBox.Show(
-                        "Se ha iniciado la descarga del modelo Phi-3-Mini.\n\n" +
-                        "El proceso se ejecutará en una ventana de comando.\n" +
-                        "Cierra esta ventana y vuelve a abrirla cuando termine la descarga.",
-                        "Descarga en Progreso",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    
-                    Close();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error iniciando descarga:\n\n{ex.Message}", 
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+
+
 
         /// <summary>
-        /// Actualiza el texto del botón Guardar según el proveedor seleccionado
+        /// Actualiza el texto del botón Guardar según el proveedor seleccionado con información específica del modelo
         /// </summary>
         private void ActualizarTextoBotonGuardar()
         {
             try
             {
-                if (ProveedorSeleccionado == "ollama")
+                switch (ProveedorSeleccionado?.ToLower())
                 {
-                    TextoBotonGuardar.Text = "Usar Ollama";
+                    case "ollama":
+                        // Determinar modelo específico de Ollama activo
+                        var modeloOllama = ObtenerModeloOllamaActivo();
+                        TextoBotonGuardar.Text = $"Activar {modeloOllama}";
+                        break;
+                        
+                    case "deepseek":
+                        // Mostrar información específica de DeepSeek
+                        var modeloDeepSeek = ObtenerModeloDeepSeekSeleccionado();
+                        TextoBotonGuardar.Text = $"Activar {modeloDeepSeek}";
+                        break;
+                        
+                    case "claude":
+                        // Mostrar información específica de Claude
+                        var modeloClaude = ObtenerModeloClaudeSeleccionado();
+                        TextoBotonGuardar.Text = $"Activar {modeloClaude}";
+                        break;
+                        
+                    default:
+                        TextoBotonGuardar.Text = "Activar OpenAI GPT-4";
+                        break;
                 }
-                else if (ProveedorSeleccionado == "deepseek")
-                {
-                    TextoBotonGuardar.Text = "Activar DeepSeek";
-                }
-                else if (ProveedorSeleccionado == "claude")
-                {
-                    TextoBotonGuardar.Text = "Activar Claude";
-                }
-                else
-                {
-                    TextoBotonGuardar.Text = "Activar OpenAI";
-                }
+                
+                // Actualizar también el indicador del modelo activo
+                ActualizarIndicadorModeloActivo();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error actualizando texto botón: {ex.Message}");
+                TextoBotonGuardar.Text = "Activar IA";
+            }
+        }
+        
+        /// <summary>
+        /// Obtiene el nombre del modelo Ollama activo o seleccionado
+        /// </summary>
+        private string ObtenerModeloOllamaActivo()
+        {
+            try
+            {
+                // Lógica para detectar qué modelo específico de Ollama está seleccionado
+                // basándose en el contenido de la pestaña actual
+                if (PanelModeloInfo?.Visibility == Visibility.Visible && 
+                    TextModeloDetectado?.Text?.Contains("DeepSeek-R1") == true)
+                {
+                    return "DeepSeek-R1 7B";
+                }
+                else if (TextModeloDetectado?.Text?.Contains("DeepSeek-V3") == true)
+                {
+                    return "DeepSeek-V3";
+                }
+                else if (TextModeloDetectado?.Text?.Contains("Phi") == true)
+                {
+                    return "Phi-4-Mini";
+                }
+                else
+                {
+                    return "Ollama Local";
+                }
+            }
+            catch
+            {
+                return "Ollama Local";
+            }
+        }
+        
+        /// <summary>
+        /// Obtiene el modelo DeepSeek seleccionado según la interfaz
+        /// </summary>
+        private string ObtenerModeloDeepSeekSeleccionado()
+        {
+            try
+            {
+                // Por defecto, usar DeepSeek-R1 como modelo principal
+                return "DeepSeek-R1 7B";
+            }
+            catch
+            {
+                return "DeepSeek";
+            }
+        }
+        
+        /// <summary>
+        /// Obtiene el modelo Claude seleccionado según la interfaz
+        /// </summary>
+        private string ObtenerModeloClaudeSeleccionado()
+        {
+            try
+            {
+                // Por defecto, usar Claude-style Llama como modelo principal
+                return "Claude-Style Llama";
+            }
+            catch
+            {
+                return "Claude";
+            }
+        }
+        
+        /// <summary>
+        /// Actualiza el indicador visual del modelo actualmente cargado
+        /// </summary>
+        private void ActualizarIndicadorModeloActivo()
+        {
+            try
+            {
+                // Usar el proveedor seleccionado actual en la interfaz
+                var proveedorActivo = ProveedorSeleccionado ?? "openai";
+                
+                var nombreModelo = proveedorActivo.ToLower() switch
+                {
+                    "openai" => "OpenAI GPT-4 Turbo",
+                    "ollama" => DeterminarModeloOllamaEspecifico(),
+                    "deepseek" => "DeepSeek-R1 7B (Razonamiento)",
+                    "claude" => "Claude-Style Llama (Conversacional)",
+                    _ => "Modelo Desconocido"
+                };
+                
+                TextoModeloActivo.Text = nombreModelo;
+                IconoModeloActivo.Visibility = Visibility.Visible;
+                
+                // Cambiar color según el tipo de modelo
+                var color = proveedorActivo.ToLower() switch
+                {
+                    "openai" => "#059669", // Verde para APIs externas
+                    "ollama" or "deepseek" or "claude" => "#0284C7", // Azul para modelos locales
+                    _ => "#6B7280"
+                };
+                
+                TextoModeloActivo.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+                
+                Debug.WriteLine($"Indicador actualizado: {nombreModelo} para proveedor: {proveedorActivo}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error actualizando indicador modelo activo: {ex.Message}");
+                TextoModeloActivo.Text = "Error detectando modelo";
+                IconoModeloActivo.Visibility = Visibility.Collapsed;
+            }
+        }
+        
+        /// <summary>
+        /// Determina el modelo específico de Ollama según el estado de la interfaz
+        /// </summary>
+        private string DeterminarModeloOllamaEspecifico()
+        {
+            try
+            {
+                // Verificar si hay información del modelo detectado en la interfaz
+                if (TextModeloDetectado?.Text?.Contains("DeepSeek-R1") == true)
+                {
+                    return "DeepSeek-R1 7B (Local)";
+                }
+                else if (TextModeloDetectado?.Text?.Contains("DeepSeek-V3") == true)
+                {
+                    return "DeepSeek-V3 (Local)";
+                }
+                else if (TextModeloDetectado?.Text?.Contains("Phi") == true)
+                {
+                    return "Phi-4-Mini (Microsoft)";
+                }
+                else
+                {
+                    return "Ollama Local";
+                }
+            }
+            catch
+            {
+                return "Ollama Local";
             }
         }
 
@@ -813,24 +887,23 @@ namespace ChatbotGomarco.Vistas
         }
 
         /// <summary>
-        /// Prepara la interfaz para futuros proveedores
+        /// Configura la interfaz para todos los proveedores AI enterprise
         /// </summary>
         private void ConfigurarProveedoresFuturos()
         {
             try
             {
-                // Por ahora, las pestañas de DeepSeek y Claude están ocultas
-                // Se pueden mostrar cuando estén implementadas
-                TabDeepSeek.Visibility = Visibility.Collapsed;
-                TabClaude.Visibility = Visibility.Collapsed;
+                // ✅ TODOS LOS PROVEEDORES ENTERPRISE ESTÁN IMPLEMENTADOS EN EL COMBOBOX
+                // - OpenAI GPT-4 Turbo (API Externa)
+                // - Ollama con Phi-4-Mini y DeepSeek-R1 (Local)  
+                // - DeepSeek-R1 7B (Razonamiento avanzado)
+                // - Claude-Style Llama (Conversacional)
                 
-                // En el futuro, esto se puede cambiar a:
-                // TabDeepSeek.Visibility = Visibility.Visible;
-                // TabClaude.Visibility = Visibility.Visible;
+                Debug.WriteLine("✅ Interfaz ComboBox configurada para todos los proveedores AI enterprise");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error configurando proveedores futuros: {ex.Message}");
+                Debug.WriteLine($"Error configurando proveedores enterprise: {ex.Message}");
             }
         }
     }

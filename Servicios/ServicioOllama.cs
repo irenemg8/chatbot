@@ -61,6 +61,47 @@ namespace ChatbotGomarco.Servicios
                 Tamaño = "2.0GB",
                 ContextoMaximo = 131072,
                 Capacidades = new[] { "chat", "analisis" }
+            },
+            // 🚀 DEEPSEEK MODELS - Advanced Reasoning & Performance
+            ["deepseek-r1:7b"] = new ModeloOllama
+            {
+                Nombre = "deepseek-r1:7b",
+                NombreVisible = "DeepSeek-R1 7B (Reasoning)",
+                Descripcion = "Modelo de razonamiento avanzado comparable a O1/Gemini 2.5 Pro, pensamiento paso a paso",
+                Tamaño = "4.7GB",
+                ContextoMaximo = 131072,
+                Capacidades = new[] { "chat", "reasoning", "analisis", "codigo", "matematicas", "pensamiento_logico" },
+                Recomendado = true
+            },
+            ["deepseek-v3:latest"] = new ModeloOllama
+            {
+                Nombre = "deepseek-v3:latest",
+                NombreVisible = "DeepSeek-V3 (General)",
+                Descripcion = "Modelo DeepSeek optimizado para tareas complejas y asistencia avanzada de código",
+                Tamaño = "2.0GB",
+                ContextoMaximo = 128000,
+                Capacidades = new[] { "chat", "analisis", "codigo", "desarrollo_software" }
+            },
+            // 🧠 CLAUDE-STYLE MODELS - Anthropic-inspired Intelligence
+            ["llama3.1-claude:latest"] = new ModeloOllama
+            {
+                Nombre = "llama3.1-claude:latest",
+                NombreVisible = "Llama 3.1 + Claude 3.5 Sonnet",
+                Descripcion = "Meta Llama 3.1 con sistema prompt de Claude 3.5 Sonnet para conversación natural",
+                Tamaño = "4.7GB",
+                ContextoMaximo = 128000,
+                Capacidades = new[] { "chat", "analisis", "escritura", "conversacion_natural", "filosofia" },
+                Recomendado = true
+            },
+            ["deepseek_r1-claude:latest"] = new ModeloOllama
+            {
+                Nombre = "deepseek_r1-claude:latest",
+                NombreVisible = "DeepSeek-R1 + Claude 3.5 Sonnet",
+                Descripcion = "DeepSeek R1 con personalidad Claude: razonamiento avanzado + conversación antropic-style",
+                Tamaño = "4.7GB",
+                ContextoMaximo = 131072,
+                Capacidades = new[] { "chat", "reasoning", "analisis", "conversacion_natural", "pensamiento_critico" },
+                Recomendado = true
             }
         };
 
@@ -181,23 +222,55 @@ namespace ChatbotGomarco.Servicios
 
                 var modelosDisponibles = await ListarModelosAsync();
                 
-                // Buscar cualquier modelo Phi disponible (phi3:mini, phi3:latest, phi4-mini, etc.)
-                var modeloPhiEncontrado = modelosDisponibles.FirstOrDefault(m => 
-                    m.Contains("phi3") || m.Contains("phi4") || m.Contains("phi-3") || m.Contains("phi-4"));
+                // Buscar cualquier modelo soportado disponible (orden de preferencia: DeepSeek-R1, Claude-style, Phi, DeepSeek-V3, Llama)
+                string modeloEncontrado = null;
                 
-                if (string.IsNullOrEmpty(modeloPhiEncontrado))
+                // Prioridad 1: DeepSeek-R1 (razonamiento avanzado)
+                modeloEncontrado = modelosDisponibles.FirstOrDefault(m => 
+                    m.Contains("deepseek-r1:7b") || m.Contains("deepseek_r1"));
+                
+                // Prioridad 2: Modelos Claude-style (conversación natural)
+                if (string.IsNullOrEmpty(modeloEncontrado))
+                {
+                    modeloEncontrado = modelosDisponibles.FirstOrDefault(m => 
+                        m.Contains("llama3.1-claude") || m.Contains("deepseek_r1-claude"));
+                }
+                
+                // Prioridad 3: Modelos Phi (estables y probados)
+                if (string.IsNullOrEmpty(modeloEncontrado))
+                {
+                    modeloEncontrado = modelosDisponibles.FirstOrDefault(m => 
+                        m.Contains("phi3") || m.Contains("phi4") || m.Contains("phi-3") || m.Contains("phi-4"));
+                }
+                
+                // Prioridad 4: DeepSeek-V3 (general)
+                if (string.IsNullOrEmpty(modeloEncontrado))
+                {
+                    modeloEncontrado = modelosDisponibles.FirstOrDefault(m => 
+                        m.Contains("deepseek-v3"));
+                }
+                
+                // Prioridad 5: Cualquier Llama disponible
+                if (string.IsNullOrEmpty(modeloEncontrado))
+                {
+                    modeloEncontrado = modelosDisponibles.FirstOrDefault(m => 
+                        m.Contains("llama"));
+                }
+                
+                if (string.IsNullOrEmpty(modeloEncontrado))
                 {
                     var estado = EstadoProveedorIA.NoDisponible(
-                        "Modelo Phi-3-Mini no está descargado",
+                        "No hay modelos AI descargados",
                         requiereInstalacion: false);
                     
-                    estado.PasosConfiguracion.Add("Descargar modelo: ollama pull phi3:mini");
-                    estado.PasosConfiguracion.Add("Usar el script: .\\ActualizarYEjecutar.ps1");
+                    estado.PasosConfiguracion.Add("Descargar modelos: .\\ActualizarYEjecutar.ps1");
+                    estado.PasosConfiguracion.Add("O manualmente: ollama pull deepseek-r1:7b");
+                    estado.PasosConfiguracion.Add("Alternativamente: ollama pull phi3:mini");
                     return estado;
                 }
                 
                 // Actualizar modelo actual al encontrado
-                _modeloActual = modeloPhiEncontrado;
+                _modeloActual = modeloEncontrado;
 
                 // Obtener información del modelo
                 var infoModelo = await ObtenerInformacionModeloAsync(_modeloActual);
