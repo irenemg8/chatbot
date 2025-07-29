@@ -21,7 +21,7 @@ namespace ChatbotGomarco.Servicios
     /// Implementa protección avanzada de datos sensibles y compliance GDPR/LOPD
     /// Compatible con GPT-4, GPT-4 Turbo, GPT-4 Vision, y GPT-3.5 Turbo con configuración Enterprise
     /// </summary>
-    public class ServicioIAOpenAI : IServicioIA
+    public class ServicioIAOpenAI : IServicioIA, IProveedorIA
     {
         private readonly ILogger<ServicioIAOpenAI> _logger;
         private readonly IAnalizadorConversacion _analizadorConversacion;
@@ -257,17 +257,20 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
                     throw new ArgumentException("La API Key no puede estar vacía o contener solo espacios en blanco");
                 }
 
+                // Validación MÍNIMA - Solo verificar que comience con sk- y tenga longitud básica
                 if (!apiKey.StartsWith("sk-"))
                 {
                     _logger.LogWarning("Formato de API Key inválido: no comienza con 'sk-'");
-                    throw new ArgumentException("Formato de API Key inválido. Debe comenzar con 'sk-' seguido de caracteres alfanuméricos");
+                    throw new ArgumentException("Formato de API Key inválido. Debe comenzar con 'sk-'");
                 }
 
-                if (apiKey.Length < 20)
+                if (apiKey.Length < 10)
                 {
                     _logger.LogWarning("API Key demasiado corta: {Length} caracteres", apiKey.Length);
                     throw new ArgumentException("La API Key parece ser demasiado corta. Verifica que sea correcta");
                 }
+
+                // SIN MÁS VALIDACIONES - OpenAI maneja los formatos internally
 
                 _apiKey = apiKey.Trim();
                 
@@ -932,6 +935,129 @@ Recuerda: Sé útil, contextual y conversacional. ¡Como si fueras ChatGPT en pe
                 _logger.LogError(ex, "Error general en comunicación con OpenAI API");
                 throw new Exception($"❌ Error inesperado al comunicarse con OpenAI: {ex.Message}", ex);
             }
+        }
+
+        // ====================================================================
+        // IMPLEMENTACIÓN DE IProveedorIA
+        // ====================================================================
+
+        public string IdProveedor => "openai";
+        public string NombreProveedor => "OpenAI (GPT-4)";
+        public bool RequiereApiKey => true;
+
+        public async Task<bool> EstaDisponibleAsync()
+        {
+            return EstaDisponible();
+        }
+
+        public async Task<bool> ValidarConfiguracionAsync()
+        {
+            try
+            {
+                return EstaDisponible() && !string.IsNullOrWhiteSpace(_apiKey);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task ConfigurarAsync(Dictionary<string, string> configuracion)
+        {
+            try
+            {
+                if (configuracion.TryGetValue("apikey", out var apiKey))
+                {
+                    // CRÍTICO: Usar el método ConfigurarClave que hace toda la validación y configuración del HttpClient
+                    ConfigurarClave(apiKey);
+                    _logger.LogInformation("✅ API Key de OpenAI configurada correctamente via ConfigurarAsync");
+                }
+                
+                if (configuracion.TryGetValue("modelo", out var modelo))
+                {
+                    // El modelo se puede configurar aquí si es necesario
+                    _logger.LogInformation("✅ Modelo OpenAI configurado: {Modelo}", modelo);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error configurando OpenAI");
+                throw;
+            }
+        }
+
+        public async Task<EstadoProveedorIA> ObtenerEstadoAsync()
+        {
+            try
+            {
+                if (!EstaDisponible())
+                {
+                    return EstadoProveedorIA.NoDisponible(
+                        "OpenAI API Key no configurada",
+                        requiereInstalacion: false);
+                }
+
+                // Verificar conectividad con una solicitud simple
+                try
+                {
+                    var testRequest = new OpenAIRequest
+                    {
+                        Model = "gpt-3.5-turbo",
+                        Messages = new List<OpenAIMessage>
+                        {
+                            new OpenAIMessage("user", "Test")
+                        },
+                        MaxTokens = 1
+                    };
+
+                    using var testClient = new HttpClient();
+                    testClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+                    testClient.Timeout = TimeSpan.FromSeconds(10);
+
+                    var jsonTest = JsonSerializer.Serialize(testRequest);
+                    var contentTest = new StringContent(jsonTest, Encoding.UTF8, "application/json");
+                    
+                    var responseTest = await testClient.PostAsync("https://api.openai.com/v1/chat/completions", contentTest);
+                    
+                    if (responseTest.IsSuccessStatusCode || responseTest.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        var estado = EstadoProveedorIA.Disponible("OpenAI API disponible y configurada");
+                        estado.Version = "GPT-4";
+                        estado.CapacidadesSoportadas.UnionWith(new[] 
+                        {
+                            "Chat", "Análisis de documentos", "Generación de código", 
+                            "Visión", "Procesamiento de imágenes"
+                        });
+                        return estado;
+                    }
+                }
+                catch (Exception testEx)
+                {
+                    _logger.LogWarning(testEx, "⚠️ No se pudo verificar conectividad con OpenAI");
+                }
+
+                return EstadoProveedorIA.Advertencia("OpenAI configurado pero conectividad no verificada");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error obteniendo estado de OpenAI");
+                return EstadoProveedorIA.NoDisponible($"Error: {ex.Message}");
+            }
+        }
+
+        public async Task<string> ProcesarChatAsync(string mensaje, List<SesionChat>? historial = null)
+        {
+            // Convertir historial de SesionChat a List<MensajeChat>
+            var historialMensajes = new List<MensajeChat>();
+            if (historial != null)
+            {
+                foreach (var sesion in historial)
+                {
+                    historialMensajes.AddRange(sesion.Mensajes);
+                }
+            }
+
+            return await GenerarRespuestaAsync(mensaje, "", historialMensajes);
         }
     }
 

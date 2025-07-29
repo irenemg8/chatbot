@@ -44,8 +44,11 @@ namespace ChatbotGomarco
             servicios.AddSingleton<IServicioProcesamientoLocal, ServicioProcesamientoLocal>();
             servicios.AddSingleton<IServicioAuditoriaSeguridad, ServicioAuditoriaSeguridad>();
             
-            // CRÍTICO: ServicioIA como Scoped para permitir reconfiguración de API key
+            // Sistema Multi-Proveedor de IA Enterprise
             servicios.AddScoped<IServicioIA, ServicioIAOpenAI>();
+            servicios.AddScoped<ServicioIAOpenAI>();
+            servicios.AddScoped<ServicioOllama>();
+            servicios.AddSingleton<IFactoryProveedorIA, FactoryProveedorIA>();
 
             // Servicios LLM modulares
             servicios.AddScoped<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();
@@ -67,6 +70,11 @@ namespace ChatbotGomarco
         public T ObtenerServicio<T>() where T : class
         {
             return _proveedorServicios!.GetRequiredService<T>();
+        }
+
+        public System.IServiceProvider ObtenerProveedorServicios()
+        {
+            return _proveedorServicios!;
         }
 
         protected override void OnExit(ExitEventArgs argumentosSalida)

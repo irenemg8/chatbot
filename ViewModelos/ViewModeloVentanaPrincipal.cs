@@ -20,6 +20,7 @@ namespace ChatbotGomarco.ViewModelos
         private readonly IServicioHistorialChats _servicioHistorial;
         private readonly IServicioArchivos _servicioArchivos;
         private readonly IServicioConfiguracion _servicioConfiguracion;
+        private readonly IFactoryProveedorIA _factoryProveedorIA;
         private readonly ILogger<ViewModeloVentanaPrincipal> _logger;
 
         [ObservableProperty]
@@ -85,12 +86,14 @@ namespace ChatbotGomarco.ViewModelos
             IServicioHistorialChats servicioHistorial,
             IServicioArchivos servicioArchivos,
             IServicioConfiguracion servicioConfiguracion,
+            IFactoryProveedorIA factoryProveedorIA,
             ILogger<ViewModeloVentanaPrincipal> logger)
         {
             _servicioChatbot = servicioChatbot;
             _servicioHistorial = servicioHistorial;
             _servicioArchivos = servicioArchivos;
             _servicioConfiguracion = servicioConfiguracion;
+            _factoryProveedorIA = factoryProveedorIA;
             _logger = logger;
 
             InicializarAsync();
@@ -176,8 +179,29 @@ namespace ChatbotGomarco.ViewModelos
                             : "sk-***";
                         
                         _logger.LogInformation("✅ DEBUG - Configurando clave cargada: {MaskedKey}", maskedKey);
-                        _servicioChatbot.ConfigurarClaveIA(claveGuardada);
-                        _logger.LogInformation("✅ API key cargada automáticamente desde configuración persistente");
+                        
+                        // CRÍTICO: Usar sistema multi-proveedor para cargar API key
+                        try 
+                        {
+                            var configuracion = new Dictionary<string, string>
+                            {
+                                ["apikey"] = claveGuardada
+                            };
+                            
+                            var proveedorOpenAI = _factoryProveedorIA.ObtenerProveedor("openai");
+                            await proveedorOpenAI.ConfigurarAsync(configuracion);
+                            
+                            // También configurar el sistema legacy para compatibilidad
+                            _servicioChatbot.ConfigurarClaveIA(claveGuardada);
+                            
+                            _logger.LogInformation("✅ API key cargada automáticamente desde configuración persistente");
+                        }
+                        catch (Exception configEx)
+                        {
+                            _logger.LogError(configEx, "❌ Error configurando proveedor OpenAI con clave guardada");
+                            // Fallback al sistema legacy
+                            _servicioChatbot.ConfigurarClaveIA(claveGuardada);
+                        }
                     }
                     else
                     {
@@ -605,49 +629,48 @@ namespace ChatbotGomarco.ViewModelos
         {
             try
             {
-                _logger.LogInformation("Iniciando configuración de OpenAI API");
+                _logger.LogInformation("Abriendo configuración multi-proveedor de IA");
                 
-                // Mostrar información previa
-                var resultadoInfo = MessageBox.Show(
-                    "🤖 CONFIGURACIÓN DE OPENAI GPT-4\n\n" +
-                    "Para activar la IA avanzada necesitas:\n" +
-                    "• Una clave API de OpenAI (comienza con 'sk-')\n" +
-                    "• Conexión a internet activa\n" +
-                    "• Créditos disponibles en tu cuenta OpenAI\n\n" +
-                    "📋 Obtén tu clave API en:\n" +
-                    "https://platform.openai.com/api-keys\n\n" +
-                    "¿Deseas continuar con la configuración?",
-                    "Configurar OpenAI GPT-4", 
-                    MessageBoxButton.YesNo, 
-                    MessageBoxImage.Information);
+                // Abrir directamente la ventana de configuración multi-proveedor
+                try
+                {
+                    // Verificar si ya hay configuración existente
+                    bool iaConfigurada = EstadoIA != "No configurada";
+                    string apiKeyActual = "";
                     
-                if (resultadoInfo != MessageBoxResult.Yes)
-                {
-                    _logger.LogInformation("Usuario canceló configuración de OpenAI");
-                    return;
-                }
-
-                // Intentar usar la ventana de configuración avanzada
-                if (System.IO.File.Exists("Vistas/VentanaConfiguracion.xaml"))
-                {
-                    try
+                    var ventanaConfig = iaConfigurada 
+                        ? new ChatbotGomarco.Vistas.VentanaConfiguracion(apiKeyActual, true)
+                        : new ChatbotGomarco.Vistas.VentanaConfiguracion();
+                    
+                    var resultado = ventanaConfig.ShowDialog();
+                    
+                    if (resultado == true && ventanaConfig.ConfiguracionGuardada)
                     {
-                        var ventanaConfig = new ChatbotGomarco.Vistas.VentanaConfiguracion();
-                        if (ventanaConfig.ShowDialog() == true && ventanaConfig.ConfiguracionGuardada)
+                        // Manejar configuración según el proveedor seleccionado
+                        if (ventanaConfig.ProveedorSeleccionado == "openai" && !string.IsNullOrEmpty(ventanaConfig.ClaveAPI))
                         {
-                            var claveAPI = ventanaConfig.ClaveAPI;
-                            await ConfigurarAPIKeyAsync(claveAPI);
+                            await ConfigurarAPIKeyAsync(ventanaConfig.ClaveAPI);
                         }
-                        return;
+                        else if (ventanaConfig.ProveedorSeleccionado == "ollama")
+                        {
+                            _logger.LogInformation("Ollama configurado como proveedor activo");
+                            // Actualizar estado de IA
+                            EstadoIA = "Ollama Configurado";
+                            OnPropertyChanged(nameof(EstadoIA));
+                        }
                     }
-                    catch (Exception ex)
+                    else if (resultado == true && ventanaConfig.ClaveEliminada)
                     {
-                        _logger.LogWarning(ex, "Error al usar ventana de configuración avanzada, usando método simple");
+                        // Manejar eliminación de configuración - usar método existente
+                        await ConfigurarAPIKeyAsync("");
                     }
                 }
-
-                // Método de configuración simple como fallback
-                UsarConfiguracionSimple();
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error al usar ventana de configuración multi-proveedor, usando método simple");
+                    // Fallback al método simple solo para casos críticos
+                    UsarConfiguracionSimple();
+                }
             }
             catch (Exception ex)
             {
@@ -684,8 +707,17 @@ namespace ChatbotGomarco.ViewModelos
                 
                 _logger.LogInformation("Configurando clave API de OpenAI: {MaskedKey}", maskedKey);
 
-                // Configurar la clave primero
-                _servicioChatbot.ConfigurarClaveIA(claveAPI);
+                // CRÍTICO: Usar el sistema multi-proveedor en lugar del legacy
+                // _servicioChatbot.ConfigurarClaveIA(claveAPI); // Sistema legacy - NO USAR
+                
+                // Configurar usando el nuevo sistema multi-proveedor
+                var configuracion = new Dictionary<string, string>
+                {
+                    ["apikey"] = claveAPI
+                };
+                
+                var proveedorOpenAI = _factoryProveedorIA.ObtenerProveedor("openai");
+                await proveedorOpenAI.ConfigurarAsync(configuracion);
                 
                 // Validar inmediatamente con una prueba simple
                 EstaPensandoConIA = true;
@@ -777,7 +809,8 @@ namespace ChatbotGomarco.ViewModelos
                     $"🚨 {errorMsg}\n\n" +
                     "📝 Formato requerido:\n" +
                     "• Debe comenzar con 'sk-'\n" +
-                    "• Debe tener al menos 20 caracteres\n" +
+                    "• Debe tener al menos 10 caracteres\n" +
+                    "• Todos los formatos OpenAI son válidos\n" +
                     "• No debe contener espacios extra\n\n" +
                     "🔗 Obtén tu clave en:\n" +
                     "https://platform.openai.com/api-keys",

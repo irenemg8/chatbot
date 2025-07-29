@@ -110,7 +110,207 @@ function Test-Prerequisites {
         }
     }
     
+    # Verificar e instalar Ollama si es necesario
+    Test-AndInstall-Ollama
+    
     Write-LogMessage "✅ Todos los prerrequisitos verificados" -Level SUCCESS
+}
+
+function Test-AndInstall-Ollama {
+    Write-LogMessage "🔍 Verificando instalación de Ollama..." -Level INFO
+    
+    try {
+        # Verificar si Ollama está instalado
+        $ollamaInstalled = $false
+        try {
+            $null = & ollama --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                $ollamaInstalled = $true
+                Write-LogMessage "✅ Ollama ya está instalado" -Level SUCCESS
+            }
+        }
+        catch {
+            # Ollama no está en PATH
+        }
+        
+        if (-not $ollamaInstalled) {
+            Write-LogMessage "📦 Ollama no detectado - iniciando instalación automática..." -Level INFO
+            Install-Ollama
+        }
+        
+        # Verificar y descargar Phi-4-Mini
+        Ensure-Phi4Mini-Model
+    }
+    catch {
+        Write-LogMessage "⚠️  Error configurando Ollama - continuando sin IA local" -Level WARN
+        Write-LogMessage "    El sistema funcionará solo con OpenAI si está configurado" -Level WARN
+    }
+}
+
+function Install-Ollama {
+    Write-LogMessage "🚀 Instalando Ollama para IA local..." -Level INFO
+    
+    try {
+        # Usar el enlace directo del instalador de Ollama (GitHub releases)
+        $ollamaUrl = "https://github.com/ollama/ollama/releases/latest/download/OllamaSetup.exe"
+        $tempPath = [System.IO.Path]::GetTempPath()
+        $installerPath = Join-Path $tempPath "OllamaSetup.exe"
+        
+        Write-LogMessage "    └─ Descargando instalador desde GitHub releases..." -Level INFO
+        
+        # Limpiar instalador anterior si existe
+        if (Test-Path $installerPath) {
+            Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+        }
+        
+        # Descargar instalador con mejor manejo de errores
+        try {
+            # Usar Invoke-WebRequest con UserAgent para evitar bloqueos
+            $webRequest = @{
+                Uri = $ollamaUrl
+                OutFile = $installerPath
+                UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                TimeoutSec = 120
+                ErrorAction = "Stop"
+            }
+            Invoke-WebRequest @webRequest
+            
+            Write-LogMessage "    └─ Descarga completada: $(Get-Item $installerPath | Select-Object -ExpandProperty Length) bytes" -Level INFO
+        }
+        catch {
+            Write-LogMessage "❌ Error descargando: $($_.Exception.Message)" -Level ERROR
+            throw "No se pudo descargar el instalador de Ollama"
+        }
+        
+        # Verificar que el archivo descargado es válido
+        if ((Test-Path $installerPath) -and (Get-Item $installerPath).Length -gt 1MB) {
+            Write-LogMessage "    └─ Archivo válido detectado, ejecutando instalador..." -Level INFO
+            
+            # Ejecutar instalador en modo silencioso
+            try {
+                $installProcess = Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait -PassThru -NoNewWindow
+                
+                if ($installProcess.ExitCode -eq 0) {
+                    Write-LogMessage "✅ Ollama instalado exitosamente" -Level SUCCESS
+                    
+                    # Esperar para que el servicio se inicialice
+                    Write-LogMessage "    └─ Esperando inicialización del servicio..." -Level INFO
+                    Start-Sleep -Seconds 10
+                    
+                    # Verificar instalación
+                    $ollamaInstalled = $false
+                    for ($i = 0; $i -lt 3; $i++) {
+                        try {
+                            $null = & ollama --version 2>$null
+                            if ($LASTEXITCODE -eq 0) {
+                                $ollamaInstalled = $true
+                                break
+                            }
+                        }
+                        catch {
+                            Start-Sleep -Seconds 3
+                        }
+                    }
+                    
+                    if ($ollamaInstalled) {
+                        Write-LogMessage "✅ Ollama verificado y funcionando" -Level SUCCESS
+                    } else {
+                        Write-LogMessage "⚠️  Ollama instalado - requiere reiniciar terminal/PowerShell" -Level WARN
+                        Write-LogMessage "    └─ Ejecuta: refreshenv o reinicia PowerShell" -Level INFO
+                    }
+                } else {
+                    throw "Instalador terminó con código de error: $($installProcess.ExitCode)"
+                }
+            }
+            catch {
+                throw "Error ejecutando instalador: $($_.Exception.Message)"
+            }
+            
+            # Limpiar archivo temporal
+            Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+        } else {
+            throw "Archivo descargado inválido o demasiado pequeño"
+        }
+    }
+    catch {
+        Write-LogMessage "❌ Error instalando Ollama: $($_.Exception.Message)" -Level ERROR
+        Write-LogMessage "" -Level INFO
+        Write-LogMessage "📋 INSTALACIÓN MANUAL RECOMENDADA:" -Level INFO
+        Write-LogMessage "    1. Visita: https://ollama.com/download" -Level INFO
+        Write-LogMessage "    2. Descarga 'Download for Windows'" -Level INFO
+        Write-LogMessage "    3. Ejecuta el instalador como administrador" -Level INFO
+        Write-LogMessage "    4. Reinicia PowerShell y ejecuta: ollama pull phi3:mini" -Level INFO
+        Write-LogMessage "" -Level INFO
+        throw
+    }
+}
+
+function Ensure-Phi4Mini-Model {
+    Write-LogMessage "🧠 Verificando modelo Phi-4-Mini..." -Level INFO
+    
+    try {
+        # Verificar si Ollama está ejecutándose
+        $ollamaRunning = $false
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:11434/api/version" -TimeoutSec 5 -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                $ollamaRunning = $true
+            }
+        }
+        catch {
+            # Ollama no está ejecutándose
+        }
+        
+        if (-not $ollamaRunning) {
+            Write-LogMessage "    └─ Iniciando servicio Ollama..." -Level INFO
+            
+            # Intentar iniciar Ollama en background
+            try {
+                Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+            }
+            catch {
+                Write-LogMessage "⚠️  No se pudo iniciar Ollama automáticamente" -Level WARN
+                return
+            }
+        }
+        
+        # Verificar si phi4-mini está disponible
+        try {
+            $models = & ollama list 2>$null
+            if ($models -match "phi4.*mini" -or $models -match "phi3.*mini") {
+                Write-LogMessage "✅ Modelo Phi Mini ya disponible" -Level SUCCESS
+                return
+            }
+        }
+        catch {
+            Write-LogMessage "⚠️  No se pudo verificar modelos de Ollama" -Level WARN
+            return
+        }
+        
+        # Descargar phi3:mini como alternativa confiable
+        Write-LogMessage "📥 Descargando modelo Phi-3-Mini (recomendado)..." -Level INFO
+        Write-LogMessage "    Este proceso puede tardar varios minutos dependiendo de tu conexión" -Level INFO
+        
+        try {
+            $pullProcess = Start-Process -FilePath "ollama" -ArgumentList "pull", "phi3:mini" -Wait -PassThru -NoNewWindow
+            
+            if ($pullProcess.ExitCode -eq 0) {
+                Write-LogMessage "✅ Modelo Phi-3-Mini descargado exitosamente" -Level SUCCESS
+                Write-LogMessage "    El chatbot ahora puede funcionar completamente offline" -Level SUCCESS
+            } else {
+                Write-LogMessage "⚠️  Descarga de modelo falló - se puede intentar manualmente" -Level WARN
+                Write-LogMessage "    Comando: ollama pull phi3:mini" -Level INFO
+            }
+        }
+        catch {
+            Write-LogMessage "⚠️  Error descargando modelo: $($_.Exception.Message)" -Level WARN
+            Write-LogMessage "    Puedes descargarlo manualmente: ollama pull phi3:mini" -Level INFO
+        }
+    }
+    catch {
+        Write-LogMessage "⚠️  Error configurando modelo Phi: $($_.Exception.Message)" -Level WARN
+    }
 }
 
 function Update-SourceCode {
@@ -206,18 +406,65 @@ function Update-SourceCode {
 }
 
 function Clear-BuildArtifacts {
-    Write-LogMessage "🧹 Limpiando artefactos de compilación..." -Level INFO
+    Write-LogMessage "🧹 Limpieza AGRESIVA de compilación y caché..." -Level INFO
     
+    # STEP 1: Terminar TODOS los procesos relacionados
+    Write-LogMessage "    └─ Terminando procesos .NET y aplicación..." -Level INFO
+    Get-Process | Where-Object {
+        $_.ProcessName -like "*ChatbotGomarco*" -or 
+        $_.ProcessName -like "*dotnet*" -or
+        $_.ProcessName -like "*MSBuild*"
+    } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    
+    # STEP 2: Limpiar directorios de build
     $artifactDirs = @("bin", "obj")
-    
     foreach ($dir in $artifactDirs) {
         if (Test-Path $dir) {
-            Write-LogMessage "    └─ Eliminando directorio: $dir" -Level INFO
+            Write-LogMessage "    └─ FORZANDO eliminación: $dir" -Level INFO
             Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
         }
     }
     
-    Write-LogMessage "✅ Artefactos eliminados exitosamente" -Level SUCCESS
+    # STEP 3: Limpiar caché de .NET y NuGet AGRESIVAMENTE
+    $cacheDirs = @(
+        "$env:USERPROFILE\.nuget\packages\.tools",
+        "$env:LOCALAPPDATA\NuGet\Cache", 
+        "$env:LOCALAPPDATA\Microsoft\VisualStudio\*\ComponentModelCache",
+        "$env:TEMP\NuGetScratch",
+        "$env:USERPROFILE\.dotnet\toolResolverCache",
+        "$env:LOCALAPPDATA\Microsoft\dotnet\cache",
+        "$env:TEMP\dotnet-*"
+    )
+    
+    foreach ($cachePattern in $cacheDirs) {
+        $matchingDirs = Get-ChildItem $cachePattern -ErrorAction SilentlyContinue
+        foreach ($dir in $matchingDirs) {
+            if (Test-Path $dir) {
+                Write-LogMessage "    └─ Limpiando caché: $($dir.Name)" -Level INFO
+                Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    
+    # STEP 4: Limpiar caché específico de la aplicación
+    $appDataPath = "$env:APPDATA\ChatbotGomarco"
+    if (Test-Path $appDataPath) {
+        Write-LogMessage "    └─ Limpiando configuraciones y caché de app..." -Level INFO
+        Remove-Item "$appDataPath\*.tmp" -Force -ErrorAction SilentlyContinue
+        Remove-Item "$appDataPath\cache" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item "$appDataPath\*.cache" -Force -ErrorAction SilentlyContinue
+    }
+    
+    # STEP 5: Limpiar archivos temporales del sistema
+    @("$env:TEMP\ChatbotGomarco*", "$env:TEMP\*.tmp") | ForEach-Object {
+        if (Test-Path $_) {
+            Remove-Item $_ -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    
+    Write-LogMessage "✅ Limpieza AGRESIVA completada - Forzando recompilación total" -Level SUCCESS
 }
 
 function Restore-Dependencies {
@@ -242,31 +489,46 @@ function Restore-Dependencies {
 }
 
 function Build-Application {
-    Write-LogMessage "🔨 Compilando aplicación en modo $($Config.BuildConfig)..." -Level INFO
+    Write-LogMessage "🔨 RECOMPILACIÓN FORZADA en modo $($Config.BuildConfig)..." -Level INFO
     
     try {
+        # PASO 1: Clean build forzado
+        Write-LogMessage "    └─ Ejecutando dotnet clean..." -Level INFO
+        $cleanOutput = & dotnet clean $Config.SolutionFile -c $Config.BuildConfig 2>&1
+        
+        # PASO 2: Build con flags de forzado
         $buildArgs = @(
             "build"
             $Config.SolutionFile
             "-c", $Config.BuildConfig
             "--no-restore"
-            "--verbosity", "minimal"
+            "--force"              # CRÍTICO: Fuerza recompilación completa
+            "--no-incremental"     # CRÍTICO: Evita build incremental
+            "--verbosity", "normal"  # Más detalle para debug
         )
         
+        Write-LogMessage "    └─ Ejecutando build completo SIN caché..." -Level INFO
         $buildOutput = & dotnet @buildArgs 2>&1
         
         if ($LASTEXITCODE -eq 0) {
-            Write-LogMessage "✅ Compilación exitosa" -Level SUCCESS
+            Write-LogMessage "✅ RECOMPILACIÓN FORZADA exitosa" -Level SUCCESS
+            
+            # Verificar que el executable se generó correctamente
+            $exePath = "bin\$($Config.BuildConfig)\net8.0-windows\$($Config.ProjectName).exe"
+            if (Test-Path $exePath) {
+                $fileInfo = Get-Item $exePath
+                Write-LogMessage "    └─ Ejecutable actualizado: $($fileInfo.LastWriteTime)" -Level SUCCESS
+            }
         } else {
-            Write-LogMessage "❌ Error en compilación:" -Level ERROR
+            Write-LogMessage "❌ Error en RECOMPILACIÓN FORZADA:" -Level ERROR
             # Convertir buildOutput a string para evitar errores de transformación de parámetros
             $buildErrorString = if ($buildOutput) { ($buildOutput -join "`n") } else { "Sin detalles de error disponibles" }
             Write-LogMessage $buildErrorString -Level ERROR
-            throw "Falló la compilación"
+            throw "Falló la recompilación forzada"
         }
     }
     catch {
-        Write-LogMessage "❌ Error crítico en compilación" -Level ERROR
+        Write-LogMessage "❌ Error crítico en recompilación forzada" -Level ERROR
         throw
     }
 }
@@ -390,9 +652,9 @@ function Main {
         Test-Prerequisites
         Update-SourceCode
         
-        if ($ForceRecompile) {
-            Clear-BuildArtifacts
-        }
+        # Forzar limpieza para asegurar que el frontend se actualice correctamente
+        Write-LogMessage "🔄 Forzando limpieza completa para actualización del frontend..." -Level INFO
+        Clear-BuildArtifacts
         
         Restore-Dependencies
         Stop-ExistingProcesses
