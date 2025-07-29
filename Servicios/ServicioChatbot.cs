@@ -59,16 +59,34 @@ namespace ChatbotGomarco.Servicios
         {
             try
             {
-                _logger.LogInformation("Procesando mensaje para sesión: {Sesion}", idSesion);
+                _logger.LogInformation("🔍 DEBUG ProcesarMensajeAsync - Procesando mensaje: '{Mensaje}' para sesión: {Sesion}", mensaje.Substring(0, Math.Min(50, mensaje.Length)), idSesion);
 
                 // PRIORIDAD 1: USAR IA SI ESTÁ DISPONIBLE
-                if (_servicioIA.EstaDisponible())
+                var iaDisponible = _servicioIA.EstaDisponible();
+                _logger.LogInformation("🔍 DEBUG ProcesarMensajeAsync - IA disponible: {Disponible}", iaDisponible);
+                
+                if (iaDisponible)
                 {
-                    return await ProcesarMensajeConIAAsync(mensaje, await ObtenerContextoArchivos(archivosContexto), historialConversacion);
+                    _logger.LogInformation("✅ DEBUG - Intentando procesar con IA OpenAI...");
+                    try
+                    {
+                        var contextoArchivos = await ObtenerContextoArchivos(archivosContexto);
+                        _logger.LogInformation("🔍 DEBUG - Contexto archivos obtenido: {Longitud} caracteres", contextoArchivos?.Length ?? 0);
+                        
+                        var respuestaIA = await ProcesarMensajeConIAAsync(mensaje, contextoArchivos, historialConversacion);
+                        _logger.LogInformation("🎉 DEBUG - Respuesta de IA obtenida exitosamente: {Longitud} caracteres", respuestaIA?.Length ?? 0);
+                        
+                        return respuestaIA;
+                    }
+                    catch (Exception exIA)
+                    {
+                        _logger.LogError(exIA, "❌ DEBUG - ERROR al procesar con IA OpenAI: {Error}", exIA.Message);
+                        _logger.LogError("❌ DEBUG - Cayendo al sistema tradicional debido al error");
+                    }
                 }
 
                 // FALLBACK: Sistema tradicional
-                _logger.LogInformation("IA no disponible, usando sistema tradicional");
+                _logger.LogInformation("⚠️ DEBUG - IA no disponible o falló, usando sistema tradicional");
                 await Task.Delay(500); // Reducir tiempo de simulación
 
                 var mensajeLower = mensaje.ToLowerInvariant();
@@ -2043,15 +2061,28 @@ namespace ChatbotGomarco.Servicios
         {
             try
             {
-                // 🧠 ANÁLISIS CONTEXTUAL INTELIGENTE
-                var mensajeOptimizado = await OptimizarMensajeConContexto(mensaje, contextoArchivos);
+                _logger.LogInformation("🔍 DEBUG ProcesarMensajeConIAAsync - Iniciando procesamiento con IA");
+                _logger.LogInformation("🔍 DEBUG - Mensaje: '{Mensaje}'", mensaje.Substring(0, Math.Min(100, mensaje.Length)));
+                _logger.LogInformation("🔍 DEBUG - Contexto archivos: {Longitud} caracteres", contextoArchivos?.Length ?? 0);
                 
-                return await _servicioIA.GenerarRespuestaAsync(mensajeOptimizado.Mensaje, mensajeOptimizado.Contexto, historialConversacion);
+                // 🧠 ANÁLISIS CONTEXTUAL INTELIGENTE
+                _logger.LogInformation("🔍 DEBUG - Optimizando mensaje con contexto...");
+                var mensajeOptimizado = await OptimizarMensajeConContexto(mensaje, contextoArchivos);
+                _logger.LogInformation("🔍 DEBUG - Mensaje optimizado: '{Optimizado}'", mensajeOptimizado.Mensaje.Substring(0, Math.Min(100, mensajeOptimizado.Mensaje.Length)));
+                
+                _logger.LogInformation("🔍 DEBUG - Llamando a _servicioIA.GenerarRespuestaAsync...");
+                var respuesta = await _servicioIA.GenerarRespuestaAsync(mensajeOptimizado.Mensaje, mensajeOptimizado.Contexto, historialConversacion);
+                _logger.LogInformation("🎉 DEBUG - Respuesta de OpenAI recibida: {Longitud} caracteres", respuesta?.Length ?? 0);
+                
+                return respuesta;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al procesar mensaje con IA");
-                return GenerarRespuestaGeneral(mensaje);
+                _logger.LogError(ex, "❌ DEBUG ERROR CRÍTICO en ProcesarMensajeConIAAsync: {Error}", ex.Message);
+                _logger.LogError("❌ DEBUG - Detalles completos del error: {StackTrace}", ex.StackTrace);
+                
+                // NO devolver fallback, propagar el error para que se maneje arriba
+                throw new Exception($"Error específico en procesamiento IA: {ex.Message}", ex);
             }
         }
         

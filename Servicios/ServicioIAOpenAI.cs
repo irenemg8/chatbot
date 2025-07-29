@@ -10,6 +10,9 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.IO;
+using System.Net.Http.Headers;
+using System.Net;
+using System.Net.Http.Json;
 
 namespace ChatbotGomarco.Servicios
 {
@@ -26,7 +29,7 @@ namespace ChatbotGomarco.Servicios
         private readonly HttpClient _httpClient;
         
         private bool _iaConfigurada = false;
-        private string? _apiKey;
+        private string? _apiKey = null;
         private readonly ConfiguracionEnterpriseOpenAI _configuracionEnterprise;
 
         // ====================================================================
@@ -46,10 +49,10 @@ namespace ChatbotGomarco.Servicios
             IDetectorDatosSensibles detectorDatosSensibles,
             HttpClient httpClient)
         {
-            _logger = logger;
-            _analizadorConversacion = analizadorConversacion;
-            _detectorDatosSensibles = detectorDatosSensibles;
-            _httpClient = httpClient;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _analizadorConversacion = analizadorConversacion ?? throw new ArgumentNullException(nameof(analizadorConversacion));
+            _detectorDatosSensibles = detectorDatosSensibles ?? throw new ArgumentNullException(nameof(detectorDatosSensibles));
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             
             // Configuración enterprise con máxima seguridad
             _configuracionEnterprise = ConfiguracionEnterpriseOpenAI.CrearConfiguracionMaximaSeguridad();
@@ -247,47 +250,95 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
             {
                 if (string.IsNullOrWhiteSpace(apiKey))
                 {
-                    throw new ArgumentException("La API Key no puede estar vacía");
+                    _logger.LogWarning("Intento de configurar API Key vacía");
+                    throw new ArgumentException("La API Key no puede estar vacía o contener solo espacios en blanco");
                 }
 
                 if (!apiKey.StartsWith("sk-"))
                 {
-                    throw new ArgumentException("Formato de API Key inválido. Debe comenzar con 'sk-'");
+                    _logger.LogWarning("Formato de API Key inválido: no comienza con 'sk-'");
+                    throw new ArgumentException("Formato de API Key inválido. Debe comenzar con 'sk-' seguido de caracteres alfanuméricos");
                 }
 
-                _apiKey = apiKey;
+                if (apiKey.Length < 20)
+                {
+                    _logger.LogWarning("API Key demasiado corta: {Length} caracteres", apiKey.Length);
+                    throw new ArgumentException("La API Key parece ser demasiado corta. Verifica que sea correcta");
+                }
+
+                _apiKey = apiKey.Trim();
                 
-                // Configurar autorización
+                // Limpiar headers previos de autorización
+                _httpClient.DefaultRequestHeaders.Authorization = null;
+                
+                // Configurar autorización con la nueva clave
                 _httpClient.DefaultRequestHeaders.Authorization = 
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
                 
                 _iaConfigurada = true;
-                _logger.LogInformation("OpenAI API configurada correctamente con clave: {MaskedKey}", 
-                    $"{apiKey[..7]}...{apiKey[^4..]}");
+                
+                var maskedKey = apiKey.Length > 10 
+                    ? $"{apiKey[..7]}...{apiKey[^4..]}" 
+                    : "sk-***";
+                    
+                _logger.LogInformation("OpenAI API configurada correctamente con clave: {MaskedKey}", maskedKey);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al configurar OpenAI API");
                 _iaConfigurada = false;
+                _apiKey = null;
+                _httpClient.DefaultRequestHeaders.Authorization = null;
                 throw;
             }
         }
 
         public bool EstaDisponible()
         {
-            return _iaConfigurada && !string.IsNullOrEmpty(_apiKey);
+            // Verificación en tiempo real del estado
+            var configurada = _iaConfigurada;
+            var tieneApiKey = !string.IsNullOrEmpty(_apiKey);
+            var httpClientConfigurado = _httpClient.DefaultRequestHeaders.Authorization != null;
+            var disponible = configurada && tieneApiKey && httpClientConfigurado;
+            
+            // DEBUG: Log detallado del estado de disponibilidad
+            _logger.LogInformation("🔍 DEBUG ServicioIAOpenAI.EstaDisponible(): configurada={Configurada}, tieneApiKey={TieneApiKey}, httpAuth={HttpAuth}, disponible={Disponible}", 
+                configurada, tieneApiKey, httpClientConfigurado, disponible);
+            
+            if (!configurada)
+            {
+                _logger.LogWarning("❌ DEBUG: _iaConfigurada es FALSE - La IA no ha sido configurada");
+            }
+            
+            if (!tieneApiKey)
+            {
+                _logger.LogWarning("❌ DEBUG: _apiKey está vacía o nula - Falta API key");
+            }
+            
+            if (!httpClientConfigurado)
+            {
+                _logger.LogWarning("❌ DEBUG: HttpClient no tiene Authorization header configurado");
+            }
+            
+            return disponible;
         }
 
         public async Task<string> GenerarRespuestaAsync(string mensaje, string contextoArchivos = "", List<MensajeChat>? historialConversacion = null)
         {
-            if (!EstaDisponible())
+            _logger.LogInformation("🔍 DEBUG GenerarRespuestaAsync - Iniciando con mensaje: '{Mensaje}'", mensaje.Substring(0, Math.Min(50, mensaje.Length)));
+            
+            var disponible = EstaDisponible();
+            _logger.LogInformation("🔍 DEBUG GenerarRespuestaAsync - EstaDisponible(): {Disponible}", disponible);
+            
+            if (!disponible)
             {
+                _logger.LogError("❌ DEBUG - OpenAI API no está configurada");
                 throw new InvalidOperationException("OpenAI API no está configurada. Configure su API Key primero.");
             }
 
             try
             {
-                _logger.LogInformation("🔒 Iniciando procesamiento enterprise con protección de datos sensibles");
+                _logger.LogInformation("🔒 DEBUG - Iniciando procesamiento enterprise con protección de datos sensibles");
 
                 // PASO 1: Procesamiento seguro con análisis de sensibilidad
                 var resultadoSeguridad = await ProcesarContenidoConSeguridadAsync(mensaje, contextoArchivos);
@@ -333,19 +384,46 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
                 };
 
                 // PASO 8: Enviar solicitud con configuración enterprise
+                _logger.LogInformation("🔍 DEBUG - Enviando solicitud a OpenAI API...");
                 var respuesta = await EnviarSolicitudOpenAIAsync(solicitud);
+                _logger.LogInformation("🔍 DEBUG - Respuesta recibida de OpenAI API: {Longitud} caracteres", respuesta?.Length ?? 0);
 
                 // PASO 9: Log de éxito con metadatos de seguridad
-                _logger.LogInformation("✅ Respuesta generada exitosamente - Estrategia: {Estrategia}, Nivel: {Nivel}, Datos anonimizados: {Cantidad}", 
+                _logger.LogInformation("✅ DEBUG - Respuesta generada exitosamente - Estrategia: {Estrategia}, Nivel: {Nivel}, Datos anonimizados: {Cantidad}", 
                     resultadoSeguridad.EstrategiaProcesamiento, 
                     resultadoSeguridad.NivelSensibilidad,
                     resultadoSeguridad.MapaAnonimizacion.Count);
                 
                 return respuesta;
             }
+            catch (HttpRequestException httpEx)
+            {
+                _logger.LogError(httpEx, "Error de conexión HTTP al comunicarse con OpenAI");
+                throw new Exception("Error de conexión con OpenAI. Verifica tu conexión a internet y que la API de OpenAI esté disponible.", httpEx);
+            }
+            catch (TaskCanceledException timeoutEx)
+            {
+                _logger.LogError(timeoutEx, "Timeout al comunicarse con OpenAI");
+                throw new Exception("La solicitud a OpenAI excedió el tiempo límite. Intenta nuevamente.", timeoutEx);
+            }
+            catch (Exception ex) when (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
+            {
+                _logger.LogError(ex, "Error de autenticación con OpenAI - API Key inválida");
+                throw new Exception("API Key de OpenAI inválida o expirada. Por favor, verifica tu clave en https://platform.openai.com/api-keys", ex);
+            }
+            catch (Exception ex) when (ex.Message.Contains("429") || ex.Message.Contains("Too Many Requests"))
+            {
+                _logger.LogError(ex, "Límite de solicitudes excedido en OpenAI");  
+                throw new Exception("Has excedido el límite de solicitudes a OpenAI. Espera unos minutos antes de intentar nuevamente.", ex);
+            }
+            catch (Exception ex) when (ex.Message.Contains("402") || ex.Message.Contains("insufficient_quota"))
+            {
+                _logger.LogError(ex, "Cuota insuficiente en OpenAI");
+                throw new Exception("Créditos insuficientes en tu cuenta de OpenAI. Verifica tu saldo en https://platform.openai.com/usage", ex);
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al generar respuesta con OpenAI");
+                _logger.LogError(ex, "Error general al generar respuesta con OpenAI");
                 throw new Exception($"Error al comunicarse con OpenAI: {ex.Message}", ex);
             }
         }
@@ -659,18 +737,40 @@ Recuerda: Sé útil, contextual y conversacional. ¡Como si fueras ChatGPT en pe
 
         private async Task<string> EnviarSolicitudOpenAIAsync(OpenAIRequest solicitud)
         {
+            if (solicitud == null)
+            {
+                throw new ArgumentNullException(nameof(solicitud), "La solicitud no puede ser nula");
+            }
+
+            if (string.IsNullOrEmpty(_apiKey))
+            {
+                throw new InvalidOperationException("API Key no configurada. Configure la clave antes de enviar solicitudes");
+            }
+
             try
             {
+                // Validar la solicitud antes de enviarla
+                if (string.IsNullOrEmpty(solicitud.Model))
+                {
+                    throw new ArgumentException("El modelo no puede estar vacío");
+                }
+
+                if (solicitud.Messages == null || !solicitud.Messages.Any())
+                {
+                    throw new ArgumentException("Debe incluir al menos un mensaje en la solicitud");
+                }
+
                 var json = JsonSerializer.Serialize(solicitud, new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    WriteIndented = false
                 });
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 
-                _logger.LogDebug("Enviando solicitud a OpenAI: {Model}, {TokenCount} tokens máx", 
-                    solicitud.Model, solicitud.MaxTokens);
+                _logger.LogDebug("Enviando solicitud a OpenAI: Modelo={Model}, MaxTokens={TokenCount}, Mensajes={MessageCount}", 
+                    solicitud.Model, solicitud.MaxTokens, solicitud.Messages.Count);
 
                 var response = await _httpClient.PostAsync(OPENAI_API_URL, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
@@ -679,31 +779,91 @@ Recuerda: Sé útil, contextual y conversacional. ¡Como si fueras ChatGPT en pe
                 {
                     _logger.LogError("Error de OpenAI API: {StatusCode} - {Content}", 
                         response.StatusCode, responseContent);
-                    throw new Exception($"Error de OpenAI API: {response.StatusCode} - {responseContent}");
+                    
+                    // Mejorar los mensajes de error específicos con más contexto
+                    var errorMessage = response.StatusCode switch
+                    {
+                        System.Net.HttpStatusCode.Unauthorized => 
+                            "🔐 API Key inválida o expirada.\n\nSoluciones:\n• Verifica tu clave en https://platform.openai.com/api-keys\n• Asegúrate de que no haya espacios extra\n• Confirma que la clave tenga permisos activos",
+                        
+                        System.Net.HttpStatusCode.PaymentRequired => 
+                            "💳 Créditos insuficientes en tu cuenta OpenAI.\n\nSoluciones:\n• Recarga saldo en https://platform.openai.com/usage\n• Verifica tu método de pago\n• Revisa el límite de uso mensual",
+                        
+                        System.Net.HttpStatusCode.TooManyRequests => 
+                            "⏰ Demasiadas solicitudes muy rápido.\n\nSoluciones:\n• Espera 1-2 minutos antes de intentar nuevamente\n• Tu cuenta puede tener límites de velocidad activos",
+                        
+                        System.Net.HttpStatusCode.InternalServerError => 
+                            "🔧 Error interno del servidor OpenAI.\n\nSoluciones:\n• Intenta nuevamente en unos minutos\n• El problema es temporal del lado de OpenAI",
+                        
+                        System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable => 
+                            "🌐 Servicio OpenAI temporalmente no disponible.\n\nSoluciones:\n• Intenta más tarde\n• Verifica el estado del servicio en https://status.openai.com",
+                        
+                        _ => $"❌ Error HTTP {(int)response.StatusCode}\n\nDetalle técnico: {responseContent}"
+                    };
+                    
+                    throw new Exception(errorMessage);
                 }
 
-                var respuesta = JsonSerializer.Deserialize<OpenAIResponse>(responseContent, new JsonSerializerOptions
+                if (string.IsNullOrWhiteSpace(responseContent))
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                });
+                    throw new Exception("OpenAI devolvió una respuesta vacía");
+                }
+
+                OpenAIResponse? respuesta = null;
+                try
+                {
+                    respuesta = JsonSerializer.Deserialize<OpenAIResponse>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch (JsonException jsonEx)
+                {
+                    _logger.LogError(jsonEx, "Error al deserializar respuesta de OpenAI: {Content}", responseContent);
+                    throw new Exception("La respuesta de OpenAI no tiene un formato válido. Puede ser un problema temporal del servicio", jsonEx);
+                }
 
                 if (respuesta?.Choices?.Any() == true)
                 {
-                    var mensaje = respuesta.Choices.First().Message?.Content;
-                    if (!string.IsNullOrEmpty(mensaje))
+                    var primerChoice = respuesta.Choices.First();
+                    var mensaje = primerChoice.Message?.Content;
+                    
+                    if (!string.IsNullOrWhiteSpace(mensaje))
                     {
-                        _logger.LogInformation("Respuesta exitosa de OpenAI: {Tokens} tokens usados", 
-                            respuesta.Usage?.TotalTokens);
-                        return mensaje;
+                        _logger.LogInformation("✅ Respuesta exitosa de OpenAI: {Tokens} tokens usados, {Chars} caracteres generados", 
+                            respuesta.Usage?.TotalTokens ?? 0, mensaje.Length);
+                        return mensaje.Trim();
+                    }
+                    else
+                    {
+                        _logger.LogWarning("OpenAI devolvió una respuesta con contenido vacío");
+                        throw new Exception("OpenAI procesó la solicitud pero devolvió contenido vacío. Intenta reformular tu pregunta");
                     }
                 }
 
-                throw new Exception("No se recibió respuesta válida de OpenAI");
+                _logger.LogError("OpenAI devolvió una respuesta sin choices válidos: {Content}", responseContent);
+                throw new Exception("OpenAI devolvió una respuesta inesperada. Puede ser un problema temporal del servicio");
             }
-            catch (Exception ex)
+            catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "Error en comunicación con OpenAI API");
-                throw;
+                _logger.LogError(ex, "Error de conexión HTTP con OpenAI API");
+                throw new Exception("🌐 Error de conexión con OpenAI.\n\nSoluciones:\n• Verifica tu conexión a internet\n• Confirma que no haya firewall bloqueando la conexión\n• Intenta nuevamente en unos momentos", ex);
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+            {
+                _logger.LogError(ex, "Timeout en comunicación con OpenAI API");
+                throw new Exception("⏰ La solicitud a OpenAI tardó demasiado.\n\nSoluciones:\n• Tu mensaje puede ser muy largo, intenta uno más corto\n• La respuesta requerida es muy compleja\n• Intenta nuevamente", ex);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Error al procesar respuesta JSON de OpenAI");
+                throw new Exception("📄 Error al procesar la respuesta de OpenAI.\n\nPosibles causas:\n• El servicio puede estar experimentando problemas\n• Respuesta corrupta o incompleta\n• Intenta nuevamente", ex);
+            }
+            catch (Exception ex) when (!(ex is ArgumentException || ex is InvalidOperationException))
+            {
+                _logger.LogError(ex, "Error general en comunicación con OpenAI API");
+                throw new Exception($"❌ Error inesperado al comunicarse con OpenAI: {ex.Message}", ex);
             }
         }
     }

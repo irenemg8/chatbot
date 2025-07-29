@@ -183,41 +183,44 @@ namespace ChatbotGomarco.Servicios
 
         public async Task LimpiarArchivosTemporalesAsync()
         {
-            try
+            await Task.Run(() =>
             {
-                if (!Directory.Exists(DirectorioArchivosTemporales))
-                    return;
-
-                var archivos = Directory.GetFiles(DirectorioArchivosTemporales);
-                var eliminados = 0;
-
-                foreach (var archivo in archivos)
+                try
                 {
-                    try
+                    if (!Directory.Exists(DirectorioArchivosTemporales))
+                        return;
+
+                    var archivos = Directory.GetFiles(DirectorioArchivosTemporales);
+                    var eliminados = 0;
+
+                    foreach (var archivo in archivos)
                     {
-                        var infoArchivo = new FileInfo(archivo);
-                        // Eliminar archivos temporales más antiguos de 1 hora
-                        if (DateTime.Now - infoArchivo.CreationTime > TimeSpan.FromHours(1))
+                        try
                         {
-                            File.Delete(archivo);
-                            eliminados++;
+                            var infoArchivo = new FileInfo(archivo);
+                            // Eliminar archivos temporales más antiguos de 1 hora
+                            if (DateTime.Now - infoArchivo.CreationTime > TimeSpan.FromHours(1))
+                            {
+                                File.Delete(archivo);
+                                eliminados++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "No se pudo eliminar archivo temporal: {Archivo}", archivo);
                         }
                     }
-                    catch (Exception ex)
+
+                    if (eliminados > 0)
                     {
-                        _logger.LogWarning(ex, "No se pudo eliminar archivo temporal: {Archivo}", archivo);
+                        _logger.LogInformation("Archivos temporales limpiados: {Cantidad}", eliminados);
                     }
                 }
-
-                if (eliminados > 0)
+                catch (Exception ex)
                 {
-                    _logger.LogInformation("Archivos temporales limpiados: {Cantidad}", eliminados);
+                    _logger.LogError(ex, "Error al limpiar archivos temporales");
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al limpiar archivos temporales");
-            }
+            });
         }
 
         private void InicializarDirectorios()

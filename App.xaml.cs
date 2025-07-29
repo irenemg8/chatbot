@@ -34,12 +34,7 @@ namespace ChatbotGomarco
             servicios.AddScoped<IServicioArchivos, ServicioArchivos>();
             servicios.AddScoped<IServicioHistorialChats, ServicioHistorialChats>();
             servicios.AddScoped<IServicioChatbot, ServicioChatbot>();
-            servicios.AddScoped<IServicioExtraccionContenido>(provider =>
-            {
-                var logger = provider.GetRequiredService<ILogger<ServicioExtraccionContenido>>();
-                var servicioIA = provider.GetService<IServicioIA>();
-                return new ServicioExtraccionContenido(logger, servicioIA);
-            });
+            servicios.AddScoped<IServicioExtraccionContenido, ServicioExtraccionContenido>();
             
             // Configurar HttpClient para OpenAI
             servicios.AddHttpClient();
@@ -47,16 +42,13 @@ namespace ChatbotGomarco
             // Servicios de seguridad enterprise
             servicios.AddSingleton<IDetectorDatosSensibles, DetectorDatosSensibles>();
             servicios.AddSingleton<IServicioAuditoriaSeguridad, ServicioAuditoriaSeguridad>();
-            servicios.AddSingleton<IServicioIA, ServicioIAOpenAI>();
+            
+            // CRÍTICO: ServicioIA como Scoped para permitir reconfiguración de API key
+            servicios.AddScoped<IServicioIA, ServicioIAOpenAI>();
 
             // Servicios LLM modulares
-            servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();
-            servicios.AddSingleton<ChatbotGomarco.Servicios.LLM.IGeneradorRespuestas>(provider =>
-            {
-                var logger = provider.GetRequiredService<ILogger<ChatbotGomarco.Servicios.LLM.GeneradorRespuestas>>();
-                var servicioIA = provider.GetService<IServicioIA>();
-                return new ChatbotGomarco.Servicios.LLM.GeneradorRespuestas(logger, servicioIA);
-            });
+            servicios.AddScoped<ChatbotGomarco.Servicios.LLM.IAnalizadorConversacion, ChatbotGomarco.Servicios.LLM.AnalizadorConversacion>();
+            servicios.AddScoped<ChatbotGomarco.Servicios.LLM.IGeneradorRespuestas, ChatbotGomarco.Servicios.LLM.GeneradorRespuestas>();
 
             // ViewModels
             servicios.AddTransient<ViewModeloVentanaPrincipal>();

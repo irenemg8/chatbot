@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using ChatbotGomarco.Modelos;
 using ChatbotGomarco.Servicios;
+using System.Collections.Generic;
 
 namespace ChatbotGomarco.ViewModelos
 {
@@ -71,9 +72,13 @@ namespace ChatbotGomarco.ViewModelos
             set => SetProperty(ref _estadoIA, value);
         }
 
-        // Comando para configurar IA
-        private RelayCommand? _comandoConfigurarIA;
-        public RelayCommand ComandoConfigurarIA => _comandoConfigurarIA ??= new RelayCommand(ConfigurarIA);
+            // Comando para configurar IA
+    private RelayCommand? _comandoConfigurarIA;
+    public RelayCommand ComandoConfigurarIA => _comandoConfigurarIA ??= new RelayCommand(ConfigurarIA);
+    
+    // DEBUG: Comando temporal para probar la IA directamente
+    private RelayCommand? _comandoDebugIA;
+    public RelayCommand ComandoDebugIA => _comandoDebugIA ??= new RelayCommand(ProbarIADebug);
 
         public ViewModeloVentanaPrincipal(
             IServicioChatbot servicioChatbot,
@@ -90,6 +95,33 @@ namespace ChatbotGomarco.ViewModelos
 
             InicializarAsync();
         }
+        
+        /// <summary>
+        /// Fuerza la actualización del estado de IA después de configurar API key
+        /// </summary>
+        private void RefrescarServicioIA()
+        {
+            _logger.LogInformation("🔄 DEBUG - Iniciando refresh completo del servicio IA...");
+            
+            // Forzar múltiples verificaciones para asegurar actualización
+            try
+            {
+                // Primero, actualizar el estado normal
+                ActualizarEstadoIA();
+                
+                // Agregar delay pequeño para asegurar que la configuración se propague
+                System.Threading.Thread.Sleep(100);
+                
+                // Verificar nuevamente
+                ActualizarEstadoIA();
+                
+                _logger.LogInformation("✅ DEBUG - Servicio IA refrescado exitosamente. Estado final: {Estado}", EstadoIA);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ DEBUG - Error al refrescar servicio IA");
+            }
+        }
 
         private async void InicializarAsync()
         {
@@ -102,6 +134,17 @@ namespace ChatbotGomarco.ViewModelos
                 await CargarAPIKeyGuardadaAsync();
                 
                 ActualizarEstadoIA();
+                
+                // DEBUG: Agregar mensaje temporal de estado para diagnóstico
+                var mensajeDebug = new MensajeChat
+                {
+                    Id = 0, // Temporal
+                    Contenido = $"🔍 DEBUG - Sistema iniciado. IA Disponible: {IADisponible}. Estado: {EstadoIA}",
+                    TipoMensaje = TipoMensaje.Sistema,
+                    FechaCreacion = DateTime.Now,
+                    IdSesionChat = SesionActual?.Id ?? ""
+                };
+                MensajesChat.Add(mensajeDebug);
             }
             catch (Exception ex)
             {
@@ -118,20 +161,37 @@ namespace ChatbotGomarco.ViewModelos
         {
             try
             {
+                _logger.LogInformation("🔍 DEBUG - Iniciando carga de API key guardada...");
+                
                 // Solo intentar cargar si el servicio de configuración está disponible
                 if (_servicioConfiguracion != null)
                 {
                     var claveGuardada = await _servicioConfiguracion.ObtenerClaveAPIAsync();
+                    _logger.LogInformation("🔍 DEBUG - Clave obtenida del servicio: {TieneClave}", !string.IsNullOrEmpty(claveGuardada));
+                    
                     if (!string.IsNullOrEmpty(claveGuardada))
                     {
+                        var maskedKey = claveGuardada.Length > 10 
+                            ? $"{claveGuardada[..7]}...{claveGuardada[^4..]}" 
+                            : "sk-***";
+                        
+                        _logger.LogInformation("✅ DEBUG - Configurando clave cargada: {MaskedKey}", maskedKey);
                         _servicioChatbot.ConfigurarClaveIA(claveGuardada);
-                        _logger.LogInformation("API key cargada automáticamente desde configuración persistente");
+                        _logger.LogInformation("✅ API key cargada automáticamente desde configuración persistente");
                     }
+                    else
+                    {
+                        _logger.LogInformation("ℹ️ DEBUG - No hay API key guardada, usuario necesita configurar");
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("❌ DEBUG - ServicioConfiguracion es NULL");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error al cargar API key guardada - continuando sin configuración persistente");
+                _logger.LogError(ex, "❌ ERROR al cargar API key guardada - continuando sin configuración persistente");
                 // No es crítico, la aplicación puede funcionar sin configuración persistente
             }
         }
@@ -207,9 +267,68 @@ namespace ChatbotGomarco.ViewModelos
             }
             catch (Exception ex)
             {
+                // Remover mensaje de "pensando" si aún está presente
+                var mensajePensando = MensajesChat.FirstOrDefault(m => m.Id == 0 && m.TipoMensaje == TipoMensaje.Sistema);
+                if (mensajePensando != null)
+                {
+                    MensajesChat.Remove(mensajePensando);
+                }
+                
                 _logger.LogError(ex, "Error al enviar mensaje");
-                MessageBox.Show("Error al procesar tu mensaje. Intenta nuevamente.", 
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                
+                // Determinar el tipo de error y mostrar mensaje apropiado
+                string mensajeError;
+                string tituloError = "⚠️ Error al Procesar Mensaje";
+                
+                if (ex.Message.Contains("API Key") || ex.Message.Contains("🔐"))
+                {
+                    mensajeError = "🔐 Problema con la configuración de OpenAI.\n\n" +
+                                  "Solución: Ve a configuración y verifica tu API Key.";
+                    tituloError = "🔑 Error de Configuración";
+                }
+                else if (ex.Message.Contains("créditos") || ex.Message.Contains("💳"))
+                {
+                    mensajeError = "💳 Sin créditos suficientes en OpenAI.\n\n" +
+                                  "Solución: Recarga saldo en https://platform.openai.com/usage";
+                    tituloError = "💰 Sin Créditos";
+                }
+                else if (ex.Message.Contains("conexión") || ex.Message.Contains("🌐"))
+                {
+                    mensajeError = "🌐 Problema de conexión a internet.\n\n" +
+                                  "Solución: Verifica tu conexión e intenta nuevamente.";
+                    tituloError = "📡 Sin Conexión";
+                }
+                else if (ex.Message.Contains("timeout") || ex.Message.Contains("⏰"))
+                {
+                    mensajeError = "⏰ La respuesta tardó demasiado.\n\n" +
+                                  "Solución: Tu mensaje puede ser muy complejo. Intenta con uno más simple.";
+                    tituloError = "⏱️ Tiempo Agotado";
+                }
+                else
+                {
+                    mensajeError = $"❌ Error inesperado:\n\n{ex.Message}\n\n" +
+                                  "💡 Sugerencias:\n" +
+                                  "• Intenta reformular tu mensaje\n" +
+                                  "• Verifica tu conexión a internet\n" +
+                                  "• Si persiste, reinicia la aplicación";
+                }
+                    
+                // Agregar mensaje de error al chat para que el usuario lo vea
+                var mensajeErrorChat = new MensajeChat
+                {
+                    Id = 0, // Temporal
+                    Contenido = $"⚠️ {mensajeError}",
+                    TipoMensaje = TipoMensaje.Sistema,
+                    FechaCreacion = DateTime.Now,
+                    IdSesionChat = SesionActual?.Id ?? ""
+                };
+                MensajesChat.Add(mensajeErrorChat);
+                
+                // También mostrar el MessageBox para errores críticos
+                if (ex.Message.Contains("API Key") || ex.Message.Contains("créditos") || ex.Message.Contains("🔐") || ex.Message.Contains("💳"))
+                {
+                    MessageBox.Show(mensajeError, tituloError, MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
             finally
             {
@@ -486,114 +605,188 @@ namespace ChatbotGomarco.ViewModelos
         {
             try
             {
-                // Obtener clave actual si existe
-                var claveActual = "";
-                try
+                _logger.LogInformation("Iniciando configuración de OpenAI API");
+                
+                // Mostrar información previa
+                var resultadoInfo = MessageBox.Show(
+                    "🤖 CONFIGURACIÓN DE OPENAI GPT-4\n\n" +
+                    "Para activar la IA avanzada necesitas:\n" +
+                    "• Una clave API de OpenAI (comienza con 'sk-')\n" +
+                    "• Conexión a internet activa\n" +
+                    "• Créditos disponibles en tu cuenta OpenAI\n\n" +
+                    "📋 Obtén tu clave API en:\n" +
+                    "https://platform.openai.com/api-keys\n\n" +
+                    "¿Deseas continuar con la configuración?",
+                    "Configurar OpenAI GPT-4", 
+                    MessageBoxButton.YesNo, 
+                    MessageBoxImage.Information);
+                    
+                if (resultadoInfo != MessageBoxResult.Yes)
                 {
-                    claveActual = await _servicioConfiguracion.ObtenerClaveAPIAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "No se pudo obtener la clave guardada");
-                    // Continuamos con clave vacía
+                    _logger.LogInformation("Usuario canceló configuración de OpenAI");
+                    return;
                 }
 
-                // Intentar abrir la ventana moderna
+                // Intentar usar la ventana de configuración avanzada
+                if (System.IO.File.Exists("Vistas/VentanaConfiguracion.xaml"))
+                {
+                    try
+                    {
+                        var ventanaConfig = new ChatbotGomarco.Vistas.VentanaConfiguracion();
+                        if (ventanaConfig.ShowDialog() == true && ventanaConfig.ConfiguracionGuardada)
+                        {
+                            var claveAPI = ventanaConfig.ClaveAPI;
+                            await ConfigurarAPIKeyAsync(claveAPI);
+                        }
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error al usar ventana de configuración avanzada, usando método simple");
+                    }
+                }
+
+                // Método de configuración simple como fallback
+                UsarConfiguracionSimple();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error durante configuración de IA");
+                MessageBox.Show(
+                    $"Error durante la configuración:\n\n{ex.Message}\n\n" +
+                    "Por favor, intenta nuevamente o verifica tu conexión a internet.",
+                    "Error de Configuración", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Configura y valida la API key de OpenAI
+        /// </summary>
+        private async Task ConfigurarAPIKeyAsync(string claveAPI)
+        {
+            if (string.IsNullOrWhiteSpace(claveAPI))
+            {
+                MessageBox.Show(
+                    "⚠️ No se proporcionó ninguna clave API.\n\nPor favor ingresa una clave válida que comience con 'sk-'",
+                    "Clave API Requerida", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                var maskedKey = claveAPI.Length > 10 
+                    ? $"{claveAPI[..7]}...{claveAPI[^4..]}" 
+                    : "sk-***";
+                
+                _logger.LogInformation("Configurando clave API de OpenAI: {MaskedKey}", maskedKey);
+
+                // Configurar la clave primero
+                _servicioChatbot.ConfigurarClaveIA(claveAPI);
+                
+                // Validar inmediatamente con una prueba simple
+                EstaPensandoConIA = true;
+                MensajePensamiento = "🔍 Validando conexión con OpenAI GPT-4...";
+                
                 try
                 {
-                    var ventanaPrincipal = System.Windows.Application.Current.MainWindow;
-                    var ventanaConfiguracion = new ChatbotGomarco.Vistas.VentanaConfiguracion(claveActual, IADisponible);
-                    ventanaConfiguracion.Owner = ventanaPrincipal;
+                    // Usar un mensaje de prueba más simple y directo
+                    var respuestaPrueba = await _servicioChatbot.ProcesarMensajeConIAAsync(
+                        "Responde únicamente: CONEXIÓN EXITOSA", 
+                        "", 
+                        null);
                     
-                    if (ventanaConfiguracion.ShowDialog() == true)
+                    EstaPensandoConIA = false;
+                    
+                    if (!string.IsNullOrWhiteSpace(respuestaPrueba))
                     {
-                        if (ventanaConfiguracion.ConfiguracionGuardada)
+                        // Guardar la configuración si es exitosa
+                        try
                         {
-                            await ProcesarConfiguracionGuardada(ventanaConfiguracion.ClaveAPI);
+                            if (_servicioConfiguracion != null)
+                            {
+                                await _servicioConfiguracion.GuardarClaveAPIAsync(claveAPI);
+                                _logger.LogInformation("Clave API guardada de forma persistente");
+                            }
                         }
-                        else if (ventanaConfiguracion.ClaveEliminada)
+                        catch (Exception saveEx)
                         {
-                            await ProcesarConfiguracionEliminada();
+                            _logger.LogWarning(saveEx, "No se pudo guardar la clave API de forma persistente - continuando sin persistencia");
                         }
+                        
+                        // Refrescar servicio IA para asegurar actualización completa
+                        RefrescarServicioIA();
+                        
+                        MessageBox.Show(
+                            "✅ ¡OpenAI GPT-4 configurado exitosamente!\n\n" +
+                            $"🔑 Clave configurada: {maskedKey}\n" +
+                            $"🎯 Respuesta de prueba: {respuestaPrueba.Substring(0, Math.Min(50, respuestaPrueba.Length))}...\n\n" +
+                            "🚀 Funciones disponibles:\n" +
+                            "• Conversaciones naturales avanzadas con GPT-4\n" +
+                            "• Análisis inteligente de documentos\n" +
+                            "• Resúmenes automáticos y detallados\n" +
+                            "• Protección de datos sensibles\n\n" +
+                            "💡 ¡Ya puedes empezar a chatear!",
+                            "🎉 Configuración Exitosa", 
+                            MessageBoxButton.OK, 
+                            MessageBoxImage.Information);
+                            
+                        _logger.LogInformation("OpenAI API configurada y validada exitosamente");
+                    }
+                    else
+                    {
+                        throw new Exception("OpenAI respondió con contenido vacío o nulo");
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error en ventana moderna, usando método simple");
+                    EstaPensandoConIA = false;
+                    _logger.LogError(ex, "Error al validar la conexión con OpenAI");
                     
-                    // Fallback al método simple
-                    UsarConfiguracionSimple();
+                    // Mostrar error más detallado y amigable
+                    var errorMsg = ex.Message.Contains("🔐") || ex.Message.Contains("💳") || ex.Message.Contains("⏰") 
+                        ? ex.Message // Ya contiene emojis y formato amigable
+                        : $"❌ Error al conectar con OpenAI:\n\n{ex.Message}";
+                    
+                    MessageBox.Show(
+                        $"{errorMsg}\n\n" +
+                        "🔧 Consejos adicionales:\n" +
+                        "• Copia y pega la clave desde https://platform.openai.com/api-keys\n" +
+                        "• Asegúrate de no incluir espacios antes o después\n" +
+                        "• Verifica que tu cuenta OpenAI esté activa\n" +
+                        "• Si persiste el problema, espera unos minutos e intenta nuevamente",
+                        "⚠️ Error de Conexión", 
+                        MessageBoxButton.OK, 
+                        MessageBoxImage.Warning);
+                    
+                    // Refrescar servicio IA incluso después de error
+                    RefrescarServicioIA();
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al configurar IA");
-                EstadoIA = "Error al configurar IA";
-                System.Windows.MessageBox.Show(
-                    $"Error al configurar la IA: {ex.Message}",
-                    "Error",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Error);
+                EstaPensandoConIA = false;
+                _logger.LogError(ex, "Error al configurar API key");
+                
+                var errorMsg = ex.Message.Contains("API Key") ? ex.Message : $"Error de configuración: {ex.Message}";
+                
+                MessageBox.Show(
+                    $"🚨 {errorMsg}\n\n" +
+                    "📝 Formato requerido:\n" +
+                    "• Debe comenzar con 'sk-'\n" +
+                    "• Debe tener al menos 20 caracteres\n" +
+                    "• No debe contener espacios extra\n\n" +
+                    "🔗 Obtén tu clave en:\n" +
+                    "https://platform.openai.com/api-keys",
+                    "❌ Error de Configuración", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
+                    
+                ActualizarEstadoIA();
             }
-        }
-
-        private async Task ProcesarConfiguracionGuardada(string claveAPI)
-        {
-            if (string.IsNullOrEmpty(claveAPI)) return;
-
-            try
-            {
-                // Guardar la clave de forma persistente
-                await _servicioConfiguracion.GuardarClaveAPIAsync(claveAPI);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "No se pudo guardar la configuración persistente");
-            }
-
-            // Configurar la IA
-            _servicioChatbot.ConfigurarClaveIA(claveAPI);
-            ActualizarEstadoIA();
-
-            if (IADisponible)
-            {
-                System.Windows.MessageBox.Show(
-                    "🚀 ¡OpenAI GPT-4 activado exitosamente!\n\n" +
-                    "Tu chatbot ahora está listo para todos los chats",
-                    "OpenAI GPT-4 Configurado",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information);
-            }
-            else
-            {
-                System.Windows.MessageBox.Show(
-                    "❌ No se pudo configurar la IA.\n\n" +
-                    "Por favor verifica que la clave API sea válida.",
-                    "Error de Configuración",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Warning);
-            }
-        }
-
-        private async Task ProcesarConfiguracionEliminada()
-        {
-            try
-            {
-                await _servicioConfiguracion.EliminarClaveAPIAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "No se pudo eliminar la configuración persistente");
-            }
-
-            ActualizarEstadoIA();
-            
-            System.Windows.MessageBox.Show(
-                "Configuración eliminada\n\n" +
-                "La clave API ha sido eliminada.",
-                "Configuración Eliminada",
-                System.Windows.MessageBoxButton.OK,
-                System.Windows.MessageBoxImage.Information);
         }
 
         private void UsarConfiguracionSimple()
@@ -624,10 +817,121 @@ namespace ChatbotGomarco.ViewModelos
 
         private void ActualizarEstadoIA()
         {
-            IADisponible = _servicioChatbot.EstaIADisponible();
-            EstadoIA = IADisponible ? "🤖 GPT-4 ACTIVADO" : "⚠️ OpenAI no configurado";
-        }
+            try
+            {
+                IADisponible = _servicioChatbot.EstaIADisponible();
+                
+                // DEBUG: Log detallado del estado
+                _logger.LogInformation("🔍 DEBUG - Verificando estado IA: IADisponible={IADisponible}", IADisponible);
+                
+                if (IADisponible)
+                {
+                    EstadoIA = "🤖 OpenAI GPT-4 ACTIVO";
+                    TituloVentana = "Chatbot GOMARCO - IA Avanzada con OpenAI GPT-4";
+                    _logger.LogInformation("✅ Estado IA actualizado: OpenAI GPT-4 disponible y funcionando");
+                }
+                else
+                {
+                    EstadoIA = "⚠️ OpenAI no configurado - Click para configurar";  
+                    TituloVentana = "Chatbot GOMARCO - Configuración de IA Requerida";
+                    _logger.LogWarning("❌ Estado IA actualizado: OpenAI NO disponible - requiere configuración");
+                    _logger.LogWarning("🔧 DEBUG - IA no disponible. Verifica si la API key está configurada correctamente.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar estado de IA");
+                IADisponible = false;
+                EstadoIA = "❌ Error en configuración de IA";
+                TituloVentana = "Chatbot GOMARCO - Error de IA";
+            }
+                }
         
+        private async void ProbarIADebug()
+        {
+            try
+            {
+                var mensajeDebug = new MensajeChat
+                {
+                    Id = 0,
+                    Contenido = "🔧 DEBUG - Iniciando prueba directa de IA...",
+                    TipoMensaje = TipoMensaje.Sistema,
+                    FechaCreacion = DateTime.Now,
+                    IdSesionChat = SesionActual?.Id ?? ""
+                };
+                MensajesChat.Add(mensajeDebug);
+                
+                // Verificar estado de IA
+                var iaDisponible = _servicioChatbot.EstaIADisponible();
+                var mensajeEstado = new MensajeChat
+                {
+                    Id = 0,
+                    Contenido = $"🔍 DEBUG - Estado IA: {(iaDisponible ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE")}",
+                    TipoMensaje = TipoMensaje.Sistema,
+                    FechaCreacion = DateTime.Now,
+                    IdSesionChat = SesionActual?.Id ?? ""
+                };
+                MensajesChat.Add(mensajeEstado);
+                
+                if (iaDisponible)
+                {
+                    EstaPensandoConIA = true;
+                    MensajePensamiento = "🧪 Probando conexión directa con OpenAI...";
+                    
+                    try
+                    {
+                        var respuesta = await _servicioChatbot.ProcesarMensajeConIAAsync(
+                            "DEBUG: Responde solo con 'OpenAI conectado exitosamente'", 
+                            "", 
+                            null);
+                        
+                        var mensajeRespuesta = new MensajeChat
+                        {
+                            Id = 0,
+                            Contenido = $"🎉 DEBUG - Respuesta de OpenAI: {respuesta}",
+                            TipoMensaje = TipoMensaje.Sistema,
+                            FechaCreacion = DateTime.Now,
+                            IdSesionChat = SesionActual?.Id ?? ""
+                        };
+                        MensajesChat.Add(mensajeRespuesta);
+                    }
+                    catch (Exception ex)
+                    {
+                        var mensajeError = new MensajeChat
+                        {
+                            Id = 0,
+                            Contenido = $"❌ DEBUG - Error al probar IA: {ex.Message}",
+                            TipoMensaje = TipoMensaje.Sistema,
+                            FechaCreacion = DateTime.Now,
+                            IdSesionChat = SesionActual?.Id ?? ""
+                        };
+                        MensajesChat.Add(mensajeError);
+                    }
+                    finally
+                    {
+                        EstaPensandoConIA = false;
+                        MensajePensamiento = string.Empty;
+                    }
+                }
+                else
+                {
+                    var mensajeNoDisponible = new MensajeChat
+                    {
+                        Id = 0,
+                        Contenido = "⚠️ DEBUG - IA no disponible. Haz clic en el estado de IA para configurar OpenAI.",
+                        TipoMensaje = TipoMensaje.Sistema,
+                        FechaCreacion = DateTime.Now,
+                        IdSesionChat = SesionActual?.Id ?? ""
+                    };
+                    MensajesChat.Add(mensajeNoDisponible);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error en debug: {ex.Message}", "Error Debug", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         /// <summary>
         /// 🧠 Genera mensajes de pensamiento contextuales e inteligentes
         /// </summary>

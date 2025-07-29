@@ -4,6 +4,10 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors>CS8632</WarningsNotAsErrors>
     <!-- <ApplicationIcon>Resources\gomarco-icon.ico</ApplicationIcon> -->
     <AssemblyTitle>Chatbot GOMARCO</AssemblyTitle>
     <AssemblyDescription>Asistente de IA corporativo para empleados de GOMARCO</AssemblyDescription>
