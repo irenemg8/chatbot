@@ -229,7 +229,9 @@ function Restore-Dependencies {
         if ($LASTEXITCODE -eq 0) {
             Write-LogMessage "✅ Dependencias restauradas exitosamente" -Level SUCCESS
         } else {
-            Write-LogMessage "❌ Error en restauración: $restoreOutput" -Level ERROR
+            # Convertir restoreOutput a string para evitar errores de transformación de parámetros
+            $restoreErrorString = if ($restoreOutput) { ($restoreOutput -join "`n") } else { "Sin detalles de error disponibles" }
+            Write-LogMessage "❌ Error en restauración: $restoreErrorString" -Level ERROR
             throw "Falló la restauración de dependencias"
         }
     }
@@ -257,7 +259,9 @@ function Build-Application {
             Write-LogMessage "✅ Compilación exitosa" -Level SUCCESS
         } else {
             Write-LogMessage "❌ Error en compilación:" -Level ERROR
-            Write-LogMessage $buildOutput -Level ERROR
+            # Convertir buildOutput a string para evitar errores de transformación de parámetros
+            $buildErrorString = if ($buildOutput) { ($buildOutput -join "`n") } else { "Sin detalles de error disponibles" }
+            Write-LogMessage $buildErrorString -Level ERROR
             throw "Falló la compilación"
         }
     }
@@ -391,8 +395,8 @@ function Main {
         }
         
         Restore-Dependencies
-        Build-Application
         Stop-ExistingProcesses
+        Build-Application
         $appStarted = Start-Application
         
         Show-Summary -Success $appStarted

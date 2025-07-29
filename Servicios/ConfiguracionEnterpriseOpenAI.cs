@@ -227,10 +227,10 @@ namespace ChatbotGomarco.Servicios
                 },
                 Fallback = new PoliticasFallback
                 {
-                    ProcesamientoLocalUltraSensible = false,
-                    RechazarSiNoSeguro = false,
+                    ProcesamientoLocalUltraSensible = true,  // ACTIVADO: Procesamiento local para datos ultra-sensibles
+                    RechazarSiNoSeguro = false,              // Permitir procesamiento local en lugar de rechazar
                     RequerirConfirmacionUsuario = false,
-                    MensajeContenidoRechazado = "Contenido procesado con protección enterprise de datos sensibles"
+                    MensajeContenidoRechazado = "Por políticas enterprise de zero data leakage, este contenido se procesa completamente en local sin transmisión externa."
                 }
             };
         }

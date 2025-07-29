@@ -41,6 +41,7 @@ namespace ChatbotGomarco
             
             // Servicios de seguridad enterprise
             servicios.AddSingleton<IDetectorDatosSensibles, DetectorDatosSensibles>();
+            servicios.AddSingleton<IServicioProcesamientoLocal, ServicioProcesamientoLocal>();
             servicios.AddSingleton<IServicioAuditoriaSeguridad, ServicioAuditoriaSeguridad>();
             
             // CRÍTICO: ServicioIA como Scoped para permitir reconfiguración de API key

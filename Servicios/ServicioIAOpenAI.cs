@@ -26,6 +26,7 @@ namespace ChatbotGomarco.Servicios
         private readonly ILogger<ServicioIAOpenAI> _logger;
         private readonly IAnalizadorConversacion _analizadorConversacion;
         private readonly IDetectorDatosSensibles _detectorDatosSensibles;
+        private readonly IServicioProcesamientoLocal _servicioProcesamientoLocal;
         private readonly HttpClient _httpClient;
         
         private bool _iaConfigurada = false;
@@ -47,11 +48,13 @@ namespace ChatbotGomarco.Servicios
             ILogger<ServicioIAOpenAI> logger,
             IAnalizadorConversacion analizadorConversacion,
             IDetectorDatosSensibles detectorDatosSensibles,
+            IServicioProcesamientoLocal servicioProcesamientoLocal,
             HttpClient httpClient)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _analizadorConversacion = analizadorConversacion ?? throw new ArgumentNullException(nameof(analizadorConversacion));
             _detectorDatosSensibles = detectorDatosSensibles ?? throw new ArgumentNullException(nameof(detectorDatosSensibles));
+            _servicioProcesamientoLocal = servicioProcesamientoLocal ?? throw new ArgumentNullException(nameof(servicioProcesamientoLocal));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             
             // Configuración enterprise con máxima seguridad
@@ -60,7 +63,7 @@ namespace ChatbotGomarco.Servicios
             // Configurar headers enterprise para OpenAI
             ConfigurarHeadersEnterprise();
             
-            _logger.LogInformation("ServicioIAOpenAI inicializado en modo Enterprise con protección de datos sensibles");
+            _logger.LogInformation("ServicioIAOpenAI inicializado en modo Enterprise con protección de datos sensibles y procesamiento local");
         }
 
         // ====================================================================
@@ -343,7 +346,18 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
                 // PASO 1: Procesamiento seguro con análisis de sensibilidad
                 var resultadoSeguridad = await ProcesarContenidoConSeguridadAsync(mensaje, contextoArchivos);
 
-                // PASO 2: Verificar si el contenido puede procesarse
+                // PASO 2: Verificar si requiere procesamiento local
+                if (resultadoSeguridad.EstrategiaProcesamiento == EstrategiaProcesamiento.ProcesamientoLocal)
+                {
+                    _logger.LogInformation("🔒 PROCESAMIENTO LOCAL activado para datos sensibles - Zero Data Leakage");
+                    return await _servicioProcesamientoLocal.GenerarRespuestaLocalAsync(
+                        mensaje, 
+                        contextoArchivos, 
+                        historialConversacion,
+                        resultadoSeguridad.MapaAnonimizacion.Values.Select(v => v.Replace("[", "").Replace("_PROTEGIDO]", "")).ToList());
+                }
+
+                // PASO 2b: Verificar si el contenido puede procesarse externamente
                 if (!resultadoSeguridad.PuedeProceaarse)
                 {
                     _logger.LogWarning("❌ Contenido rechazado por políticas de seguridad: {Nivel}", resultadoSeguridad.NivelSensibilidad);
@@ -430,13 +444,29 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
 
         public async Task<string> AnalizarContenidoConIAAsync(string contenidoArchivos, string pregunta)
         {
-            if (!EstaDisponible())
-            {
-                throw new InvalidOperationException("OpenAI API no está configurada");
-            }
-
             try
             {
+                // PASO 1: Verificar datos sensibles antes de procesar
+                var resultadoSeguridad = await ProcesarContenidoConSeguridadAsync(pregunta, contenidoArchivos);
+                
+                // PASO 2: Si requiere procesamiento local, usar servicio local
+                if (resultadoSeguridad.EstrategiaProcesamiento == EstrategiaProcesamiento.ProcesamientoLocal)
+                {
+                    _logger.LogInformation("🔒 Análisis LOCAL activado para contenido con datos sensibles");
+                    return await _servicioProcesamientoLocal.AnalizarContenidoLocalAsync(
+                        contenidoArchivos, 
+                        pregunta,
+                        resultadoSeguridad.MapaAnonimizacion.Values.Select(v => v.Replace("[", "").Replace("_PROTEGIDO]", "")).ToList());
+                }
+
+                // PASO 3: Procesar con OpenAI si no hay datos sensibles
+                if (!EstaDisponible())
+                {
+                    throw new InvalidOperationException("OpenAI API no está configurada");
+                }
+
+                // Usar contenido anonimizado para envío seguro a OpenAI
+                var contenidoSeguro = resultadoSeguridad.ContenidoAnonimizado;
                 var mensajeSistema = @"Eres MARCO, el asistente conversacional de GOMARCO. Te comportas como ChatGPT: natural, inteligente y útil. NO eres un robot corporativo.
 
 🎯 **TU ESTILO:**
@@ -464,9 +494,11 @@ Para cualquier pregunta → Encuentra la respuesta específica en el documento
 
                 var mensaje = $@"He aquí el contenido del documento que necesitas analizar:
 
-{contenidoArchivos}
+{contenidoSeguro}
 
 El usuario pregunta: ""{pregunta}""
+
+IMPORTANTE: El contenido puede contener datos enmascarados con asteriscos (*) por políticas de seguridad. Esto es normal y debes trabajar con esta información protegida.
 
 Analiza inteligentemente y responde de forma conversacional. Contextualiza primero qué tipo de documento es, luego responde específicamente a su pregunta. Si puedes ofrecer insights adicionales útiles, hazlo. Recuerda: sé como ChatGPT - natural, útil y conversacional.";
 
@@ -499,13 +531,29 @@ Analiza inteligentemente y responde de forma conversacional. Contextualiza prime
 
         public async Task<string> GenerarResumenInteligente(string contenido, string tipoResumen = "general")
         {
-            if (!EstaDisponible())
-            {
-                throw new InvalidOperationException("OpenAI API no está configurada");
-            }
-
             try
             {
+                // PASO 1: Verificar datos sensibles
+                var resultadoSeguridad = await ProcesarContenidoConSeguridadAsync(contenido);
+                
+                // PASO 2: Si requiere procesamiento local, usar servicio local
+                if (resultadoSeguridad.EstrategiaProcesamiento == EstrategiaProcesamiento.ProcesamientoLocal)
+                {
+                    _logger.LogInformation("🔒 Resumen LOCAL activado para contenido con datos sensibles");
+                    return await _servicioProcesamientoLocal.GenerarResumenLocalAsync(
+                        contenido, 
+                        tipoResumen,
+                        resultadoSeguridad.MapaAnonimizacion.Values.Select(v => v.Replace("[", "").Replace("_PROTEGIDO]", "")).ToList());
+                }
+
+                // PASO 3: Procesar con OpenAI si no hay datos sensibles
+                if (!EstaDisponible())
+                {
+                    throw new InvalidOperationException("OpenAI API no está configurada");
+                }
+
+                // Usar contenido anonimizado
+                var contenidoSeguro = resultadoSeguridad.ContenidoAnonimizado;
                 var instruccionesResumen = tipoResumen.ToLower() switch
                 {
                     "ejecutivo" => @"Genera un RESUMEN EJECUTIVO empresarial que incluya:
@@ -550,7 +598,9 @@ Extensión: 2-3 párrafos, equilibrado y comprensible."
 - Mantén un tono profesional y empresarial";
 
                 var mensaje = $@"**CONTENIDO PARA RESUMIR:**
-{contenido}
+{contenidoSeguro}
+
+IMPORTANTE: El contenido puede contener datos enmascarados con asteriscos (*) por políticas de seguridad. Esto es normal para proteger información sensible.
 
 Genera el resumen siguiendo las instrucciones específicas para el tipo: {tipoResumen}";
 
@@ -583,18 +633,33 @@ Genera el resumen siguiendo las instrucciones específicas para el tipo: {tipoRe
 
         public async Task<List<string>> GenerarSugerenciasPreguntasAsync(string contenidoArchivos)
         {
-            if (!EstaDisponible())
-            {
-                return new List<string>
-                {
-                    "¿Puedes resumir el contenido principal?",
-                    "¿Cuáles son los datos más importantes?",
-                    "¿Qué información específica contiene?"
-                };
-            }
-
             try
             {
+                // PASO 1: Verificar datos sensibles
+                var resultadoSeguridad = await ProcesarContenidoConSeguridadAsync(contenidoArchivos);
+                
+                // PASO 2: Si requiere procesamiento local, usar servicio local
+                if (resultadoSeguridad.EstrategiaProcesamiento == EstrategiaProcesamiento.ProcesamientoLocal)
+                {
+                    _logger.LogInformation("🔒 Sugerencias LOCALES activadas para contenido con datos sensibles");
+                    return await _servicioProcesamientoLocal.GenerarSugerenciasLocalesAsync(
+                        contenidoArchivos,
+                        resultadoSeguridad.MapaAnonimizacion.Values.Select(v => v.Replace("[", "").Replace("_PROTEGIDO]", "")).ToList());
+                }
+
+                // PASO 3: Procesar con OpenAI si no hay datos sensibles
+                if (!EstaDisponible())
+                {
+                    return new List<string>
+                    {
+                        "¿Puedes resumir el contenido principal?",
+                        "¿Cuáles son los datos más importantes?",
+                        "¿Qué información específica contiene?"
+                    };
+                }
+
+                // Usar contenido anonimizado
+                var contenidoSeguro = resultadoSeguridad.ContenidoAnonimizado;
                 var mensajeSistema = @"Eres un experto en análisis de documentos. Tu tarea es generar preguntas inteligentes y específicas basadas en el contenido proporcionado.
 
 **INSTRUCCIONES:**
@@ -606,7 +671,9 @@ Genera el resumen siguiendo las instrucciones específicas para el tipo: {tipoRe
 
                 var mensaje = $@"Basándote en este contenido, genera 5 preguntas específicas y relevantes:
 
-{contenidoArchivos.Substring(0, Math.Min(2000, contenidoArchivos.Length))}...
+{contenidoSeguro.Substring(0, Math.Min(2000, contenidoSeguro.Length))}...
+
+NOTA: El contenido puede tener datos enmascarados con asteriscos (*) por seguridad.
 
 Genera las preguntas:";
 

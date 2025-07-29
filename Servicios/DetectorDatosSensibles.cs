@@ -11,6 +11,7 @@ namespace ChatbotGomarco.Servicios
     /// Servicio enterprise de detección y anonimización de datos sensibles
     /// Implementa protección avanzada PII/PCI antes del envío a servicios de IA externos
     /// Cumple con GDPR, LOPD y estándares de seguridad corporativa
+    /// VERSIÓN 2.0: Implementa enmascaramiento con asteriscos y procesamiento local obligatorio
     /// </summary>
     public interface IDetectorDatosSensibles
     {
@@ -142,7 +143,7 @@ namespace ChatbotGomarco.Servicios
 
             try
             {
-                _logger.LogDebug("Iniciando análisis de sensibilidad de contenido ({Length} caracteres)", contenido.Length);
+                _logger.LogDebug("🔍 Iniciando análisis enterprise de sensibilidad de contenido ({Length} caracteres)", contenido.Length);
 
                 var resultado = new ResultadoAnonimizacion
                 {
@@ -151,7 +152,7 @@ namespace ChatbotGomarco.Servicios
 
                 var contadorAnonimizaciones = 0;
 
-                // Procesar cada patrón de datos sensibles
+                // Procesar cada patrón de datos sensibles con nueva estrategia de asteriscos
                 foreach (var (tipo, patron) in PATRONES_DATOS_SENSIBLES)
                 {
                     var coincidencias = patron.Matches(resultado.ContenidoAnonimizado);
@@ -159,10 +160,12 @@ namespace ChatbotGomarco.Servicios
                     foreach (Match coincidencia in coincidencias)
                     {
                         var valorOriginal = coincidencia.Value;
-                        var valorAnonimizado = GenerarTokenAnonimizado(tipo, contadorAnonimizaciones);
+                        // NUEVA ESTRATEGIA: Usar asteriscos en lugar de tokens
+                        var valorEnmascarado = GenerarEnmascaramientoAsteriscos(valorOriginal, tipo);
                         
-                        resultado.ContenidoAnonimizado = resultado.ContenidoAnonimizado.Replace(valorOriginal, valorAnonimizado);
-                        resultado.MapaAnonimizacion[valorAnonimizado] = valorOriginal;
+                        resultado.ContenidoAnonimizado = resultado.ContenidoAnonimizado.Replace(valorOriginal, valorEnmascarado);
+                        // Mantener mapeo para auditoría (sin el valor real por seguridad)
+                        resultado.MapaAnonimizacion[valorEnmascarado] = $"[{tipo}_PROTEGIDO]";
                         
                         if (!resultado.TiposDatosSensiblesDetectados.Contains(tipo))
                         {
@@ -171,26 +174,31 @@ namespace ChatbotGomarco.Servicios
                         
                         contadorAnonimizaciones++;
                         
-                        _logger.LogWarning("Dato sensible detectado y anonimizado: {Tipo} -> {Token}", tipo, valorAnonimizado);
+                        _logger.LogWarning("🚨 Dato sensible detectado y enmascarado: {Tipo} -> {Mascara}", tipo, valorEnmascarado);
                     }
                 }
 
                 resultado.CantidadDatosAnonimizados = contadorAnonimizaciones;
                 resultado.NivelDetectado = ClasificarSensibilidad(contenido);
-                // Siempre procesar con anonimización, nunca rechazar
-                resultado.RequiereProcesamientoLocal = false;
+                
+                // NUEVA POLÍTICA ENTERPRISE: Datos sensibles requieren procesamiento local
+                resultado.RequiereProcesamientoLocal = DeterminarRequiereProcesamientoLocal(
+                    resultado.NivelDetectado, 
+                    contadorAnonimizaciones, 
+                    resultado.TiposDatosSensiblesDetectados);
 
-                _logger.LogInformation("Análisis completado: {Nivel} sensibilidad, {Cantidad} datos anonimizados, {Tipos} tipos detectados", 
+                _logger.LogInformation("✅ Análisis enterprise completado: {Nivel} sensibilidad, {Cantidad} datos enmascarados, {Tipos} tipos detectados, Procesamiento local: {Local}", 
                     resultado.NivelDetectado, 
                     resultado.CantidadDatosAnonimizados,
-                    string.Join(", ", resultado.TiposDatosSensiblesDetectados));
+                    string.Join(", ", resultado.TiposDatosSensiblesDetectados),
+                    resultado.RequiereProcesamientoLocal);
 
                 return resultado;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error durante la anonimización de contenido");
-                throw new Exception("Error en el procesamiento de seguridad de datos", ex);
+                _logger.LogError(ex, "Error durante el análisis enterprise de sensibilidad de datos");
+                throw new Exception("Error en el sistema enterprise de protección de datos sensibles", ex);
             }
         }
 
@@ -231,12 +239,12 @@ namespace ChatbotGomarco.Servicios
             var densidadDatos = (datosSensiblesDetectados * 1000.0) / contenido.Length;
             puntuacionSensibilidad += (int)(densidadDatos * 10);
 
-            // Clasificar según puntuación (más permisivo)
+            // Clasificar según puntuación (más estricto para enterprise)
             return puntuacionSensibilidad switch
             {
-                >= 50 => NivelSensibilidad.UltraSecreto,
-                >= 25 => NivelSensibilidad.Confidencial,
-                >= 10 => NivelSensibilidad.Interno,
+                >= 30 => NivelSensibilidad.UltraSecreto,
+                >= 15 => NivelSensibilidad.Confidencial,
+                >= 5 => NivelSensibilidad.Interno,
                 _ => NivelSensibilidad.Publico
             };
         }
@@ -254,24 +262,89 @@ namespace ChatbotGomarco.Servicios
         }
 
         /// <summary>
-        /// Genera un token único para cada dato anonimizado
-        /// Permite tracking y potencial restauración sin exponer el dato original
+        /// Genera enmascaramiento con asteriscos para visualización segura de datos sensibles
+        /// Implementa estrategia enterprise de zero data leakage visual
         /// </summary>
-        private static string GenerarTokenAnonimizado(string tipoDato, int contador)
+        private static string GenerarEnmascaramientoAsteriscos(string valorOriginal, string tipoDato)
         {
-            var prefijo = tipoDato switch
-            {
-                var t when t.Contains("dni") => "DNI",
-                var t when t.Contains("tarjeta") => "CARD",
-                var t when t.Contains("iban") => "IBAN",
-                var t when t.Contains("telefono") => "PHONE",
-                var t when t.Contains("email") => "EMAIL",
-                var t when t.Contains("direccion") => "ADDR",
-                var t when t.Contains("fecha") => "DATE",
-                _ => "DATA"
-            };
+            // Estrategia de enmascaramiento según tipo de dato y longitud
+            var longitud = valorOriginal.Length;
             
-            return $"[{prefijo}_ANONIMIZADO_{contador:D3}]";
+            return tipoDato switch
+            {
+                // DNI/NIE: Mostrar solo último dígito y letra
+                var t when t.Contains("dni") || t.Contains("nie") => 
+                    longitud > 2 ? $"*****{valorOriginal[^2..]}" : new string('*', longitud),
+                
+                // Tarjetas: Mostrar solo últimos 4 dígitos
+                var t when t.Contains("tarjeta") =>
+                    longitud >= 4 ? $"****-****-****-{valorOriginal[^4..]}" : new string('*', longitud),
+                
+                // IBAN: Mostrar solo código país y últimos 4
+                var t when t.Contains("iban") =>
+                    longitud >= 6 ? $"{valorOriginal[..2]}**-****-****-****-{valorOriginal[^4..]}" : new string('*', longitud),
+                
+                // Email: Mostrar primera letra y dominio
+                var t when t.Contains("email") =>
+                    EnmascararEmail(valorOriginal, longitud),
+                
+                // Teléfono: Mostrar solo últimos 3 dígitos
+                var t when t.Contains("telefono") =>
+                    longitud >= 3 ? $"***-***-{valorOriginal[^3..]}" : new string('*', longitud),
+                
+                // Direcciones: Enmascarar completamente número
+                var t when t.Contains("direccion") =>
+                    System.Text.RegularExpressions.Regex.Replace(valorOriginal, @"\d+", "***"),
+                
+                // Fechas: Enmascarar día y mes, mantener año si es laboral
+                var t when t.Contains("fecha") =>
+                    System.Text.RegularExpressions.Regex.Replace(valorOriginal, @"(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})", "**/**/****"),
+                
+                // CIF: Mostrar solo letra inicial
+                var t when t.Contains("cif") =>
+                    longitud > 0 ? $"{valorOriginal[0]}*******" : new string('*', longitud),
+                
+                // Otros datos: Enmascaramiento completo
+                _ => new string('*', Math.Max(longitud, 5))
+            };
+        }
+
+        /// <summary>
+        /// Enmascara email mostrando primera letra y dominio completo
+        /// </summary>
+        private static string EnmascararEmail(string email, int longitud)
+        {
+            var partes = email.Split('@');
+            if (partes.Length == 2 && partes[0].Length > 0)
+                return $"{partes[0][0]}***@{partes[1]}";
+            return new string('*', longitud);
+        }
+
+        /// <summary>
+        /// Determina si el contenido requiere procesamiento local según políticas enterprise
+        /// Implementa matriz de decisión basada en sensibilidad y tipos de datos
+        /// </summary>
+        private bool DeterminarRequiereProcesamientoLocal(
+            NivelSensibilidad nivel, 
+            int cantidadDatos, 
+            List<string> tiposDatos)
+        {
+            // Política enterprise: Cualquier dato sensible requiere procesamiento local
+            if (cantidadDatos > 0)
+            {
+                _logger.LogInformation("🔒 Procesamiento local requerido: {Cantidad} datos sensibles detectados", cantidadDatos);
+                return true;
+            }
+
+            // Política por nivel de sensibilidad
+            return nivel switch
+            {
+                NivelSensibilidad.UltraSecreto => true,      // Siempre local
+                NivelSensibilidad.Confidencial => true,     // Siempre local
+                NivelSensibilidad.Interno => cantidadDatos > 0,  // Local si hay datos sensibles
+                NivelSensibilidad.Publico => false,         // Puede usar OpenAI
+                _ => false
+            };
         }
     }
 } 

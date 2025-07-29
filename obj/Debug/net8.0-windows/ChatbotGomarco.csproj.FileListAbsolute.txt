@@ -200,3 +200,5 @@ C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\ChatbotGomarco.genruntim
 C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\ref\ChatbotGomarco.dll
 C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaConfiguracion.baml
 C:\Users\irene\Desktop\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaConfiguracion.g.cs
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaConfiguracion.baml
+C:\Users\vicen\OneDrive\Escritorio\RoadToDevOps\chatbot\obj\Debug\net8.0-windows\Vistas\VentanaConfiguracion.g.cs

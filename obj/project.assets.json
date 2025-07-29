@@ -6215,25 +6215,24 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\irene\\.nuget\\packages\\": {}
+    "C:\\Users\\vicen\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\irene\\Desktop\\chatbot\\ChatbotGomarco.csproj",
+      "projectUniqueName": "C:\\Users\\vicen\\OneDrive\\Escritorio\\RoadToDevOps\\chatbot\\ChatbotGomarco.csproj",
       "projectName": "ChatbotGomarco",
-      "projectPath": "C:\\Users\\irene\\Desktop\\chatbot\\ChatbotGomarco.csproj",
-      "packagesPath": "C:\\Users\\irene\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\irene\\Desktop\\chatbot\\obj\\",
+      "projectPath": "C:\\Users\\vicen\\OneDrive\\Escritorio\\RoadToDevOps\\chatbot\\ChatbotGomarco.csproj",
+      "packagesPath": "C:\\Users\\vicen\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\vicen\\OneDrive\\Escritorio\\RoadToDevOps\\chatbot\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\irene\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\vicen\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0-windows"
       ],
       "sources": {
-        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -6353,7 +6352,7 @@
       "code": "NU1903",
       "level": "Warning",
       "warningLevel": 1,
-      "message": "El paquete \"SixLabors.ImageSharp\" 3.1.5 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-2cmq-823j-5qj8",
+      "message": "Package 'SixLabors.ImageSharp' 3.1.5 has a known high severity vulnerability, https://github.com/advisories/GHSA-2cmq-823j-5qj8",
       "libraryId": "SixLabors.ImageSharp",
       "targetGraphs": [
         "net8.0-windows7.0"
