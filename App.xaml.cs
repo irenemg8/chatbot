@@ -48,6 +48,8 @@ namespace ChatbotGomarco
             servicios.AddScoped<IServicioIA, ServicioIAOpenAI>();
             servicios.AddScoped<ServicioIAOpenAI>();
             servicios.AddScoped<ServicioOllama>();
+            servicios.AddScoped<ServicioDeepSeek>();
+            servicios.AddScoped<ServicioClaude>();
             servicios.AddSingleton<IFactoryProveedorIA, FactoryProveedorIA>();
 
             // Servicios LLM modulares

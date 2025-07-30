@@ -151,6 +151,23 @@ if errorlevel 1 (
     echo    └─ ✅ Phi-3-Mini ya está disponible
 )
 
+:: Intentar instalar deepseek-r1:7b si no está disponible  
+ollama list | findstr "deepseek" >nul 2>&1
+if errorlevel 1 (
+    echo    └─ 📥 Descargando DeepSeek-R1 7B (razonamiento avanzado)...
+    echo       Esto puede tardar 10-15 minutos...
+    start /wait "" ollama pull deepseek-r1:7b
+    if not errorlevel 1 (
+        echo    └─ ✅ DeepSeek-R1 7B instalado correctamente
+        echo [%time%] SUCCESS: deepseek-r1:7b installed >> logs\%LOG_FILE%
+    ) else (
+        echo    └─ ⚠️  Error descargando DeepSeek-R1 7B
+        echo [%time%] WARNING: deepseek-r1:7b install failed >> logs\%LOG_FILE%
+    )
+) else (
+    echo    └─ ✅ DeepSeek-R1 7B ya está disponible
+)
+
 echo    ✅ Configuración de Ollama completada
 echo [%time%] SUCCESS: Ollama setup completed >> logs\%LOG_FILE%
 
@@ -282,33 +299,24 @@ echo ║                     🎉 CHATBOT GOMARCO LISTO 🎉                 ║
 echo ║                   ✅ OLLAMA Y DEEPSEEK ACTIVOS ✅                ║
 echo ╚══════════════════════════════════════════════════════════════════╝
 echo.
-echo 📊 Resumen de la operación:
-echo    • Proyecto: %PROJECT_NAME%
-echo    • Configuración: %BUILD_CONFIG%
-echo    • Timestamp: %date% %time%
-echo    • Log: logs\%LOG_FILE%
-echo.
 echo 🚀 FUNCIONALIDADES DISPONIBLES:
 echo    ✅ OpenAI GPT-4 (Requiere API Key)
 echo    ✅ DeepSeek-R1 7B (Local, Razonamiento Avanzado)
 echo    ✅ Phi-3-Mini (Local, Estable)
 echo    ✅ Ollama (Procesamiento 100%% Local)
 echo.
+echo 📊 Resumen de la operación:
+echo    • Proyecto: %PROJECT_NAME%
+echo    • Configuración: %BUILD_CONFIG%
+echo    • Timestamp: %date% %time%
+echo    • Log: logs\%LOG_FILE%
+echo.
 echo 💡 La aplicación debería estar ejecutándose ahora.
 echo 🧠 DeepSeek y modelos locales están listos para usar.
 echo 📋 Si hay problemas, revisa el archivo de log para detalles.
 echo.
 
-:: Abrir el directorio de logs si hay errores
-if exist "logs\%LOG_FILE%" (
-    echo 📁 ¿Deseas abrir el directorio de logs? (S/N)
-    set /p OPEN_LOGS=
-    if /i "!OPEN_LOGS!"=="S" (
-        explorer logs
-    )
-)
-
 echo [%time%] === CONFIGURACIÓN COMPLETADA === >> logs\%LOG_FILE%
 echo.
 echo Presiona cualquier tecla para cerrar esta ventana...
-pause >nul 
+pause >nul

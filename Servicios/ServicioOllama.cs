@@ -720,6 +720,59 @@ Tú: ""Es un informe financiero de Q2 2025 de GOMARCO. Básicamente, muestra un 
             public bool Recomendado { get; set; }
         }
 
+        /// <summary>
+        /// Verifica si un modelo específico está disponible en Ollama
+        /// </summary>
+        public async Task<bool> VerificarModeloDisponibleAsync(string nombreModelo)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(nombreModelo))
+                    return false;
+
+                var modelosDisponibles = await ListarModelosAsync();
+                return modelosDisponibles.Any(m => m.Equals(nombreModelo, StringComparison.OrdinalIgnoreCase) || 
+                                                   m.StartsWith(nombreModelo.Split(':')[0], StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error verificando modelo {Modelo}", nombreModelo);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Genera respuesta usando un modelo específico
+        /// </summary>
+        public async Task<string> GenerarRespuestaConModeloAsync(string mensaje, string modelo, List<MensajeChat>? historial = null)
+        {
+            try
+            {
+                // Guardar modelo actual temporalmente
+                var modeloOriginal = _modeloActual;
+                
+                // Cambiar al modelo especificado
+                _modeloActual = modelo;
+                
+                // No need to convert, pass null for now as the ProcesarChatAsync method 
+                // doesn't directly use the full message history in the same way
+                List<SesionChat>? historialSesion = null;
+                
+                // Generar respuesta
+                var respuesta = await ProcesarChatAsync(mensaje, historialSesion);
+                
+                // Restaurar modelo original
+                _modeloActual = modeloOriginal;
+                
+                return respuesta;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error generando respuesta con modelo {Modelo}", modelo);
+                throw new InvalidOperationException($"Error con modelo {modelo}: {ex.Message}", ex);
+            }
+        }
+
         private class ModelInfo
         {
             public string Size { get; set; }

@@ -35,9 +35,9 @@ namespace ChatbotGomarco.Servicios
             _proveedoresRegistrados = new Dictionary<string, Type>
             {
                 ["openai"] = typeof(ServicioIAOpenAI),
-                ["ollama"] = typeof(ServicioOllama)
-                // Futuras expansiones: ["deepseek"] = typeof(ServicioDeepSeek)
-                // ["claude"] = typeof(ServicioClaude)
+                ["ollama"] = typeof(ServicioOllama),
+                ["deepseek"] = typeof(ServicioDeepSeek),
+                ["claude"] = typeof(ServicioClaude)
             };
             
             InicializarProveedorActivo();

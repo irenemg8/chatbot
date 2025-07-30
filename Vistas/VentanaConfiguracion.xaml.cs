@@ -215,6 +215,14 @@ namespace ChatbotGomarco.Vistas
                 {
                     await GuardarConfiguracionOllamaAsync();
                 }
+                else if (ProveedorSeleccionado == "deepseek")
+                {
+                    await GuardarConfiguracionDeepSeekAsync();
+                }
+                else if (ProveedorSeleccionado == "claude")
+                {
+                    await GuardarConfiguracionClaudeAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -366,6 +374,94 @@ namespace ChatbotGomarco.Vistas
             catch (Exception ex)
             {
                 MessageBox.Show($"Error configurando Ollama:\n\n{ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Guarda la configuración de DeepSeek
+        /// </summary>
+        private async Task GuardarConfiguracionDeepSeekAsync()
+        {
+            try
+            {
+                // Verificar que Ollama esté disponible (DeepSeek usa Ollama como backend)
+                var estadoOllama = await _factoryProveedorIA.ObtenerEstadoTodosProveedoresAsync();
+                
+                if (!estadoOllama.TryGetValue("ollama", out var estado) || !estado.EstaDisponible)
+                {
+                    MessageBox.Show("DeepSeek requiere Ollama para funcionar.\n\n" +
+                        "• Verifica que Ollama esté instalado y funcionando\n" +
+                        "• Asegúrate de que el modelo DeepSeek-R1 esté descargado\n" +
+                        "• Usa los botones de instalación si es necesario",
+                        "Ollama requerido", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Confirmación
+                var resultado = MessageBox.Show("¿Deseas activar DeepSeek-R1 7B como proveedor de IA?\n\n" +
+                    "• 🧠 Modelo de razonamiento avanzado\n" +
+                    "• 📊 Excelente para análisis y lógica compleja\n" +
+                    "• 🔒 Procesamiento 100% local y offline\n" +
+                    "• 🚀 Zero data leakage - datos nunca salen de tu PC\n" +
+                    "• ⚡ No requiere API Key ni conexión a internet",
+                    "Activar DeepSeek-R1", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (resultado == MessageBoxResult.Yes)
+                {
+                    await CambiarProveedorActivoAsync("deepseek");
+                    ConfiguracionGuardada = true;
+                    DialogResult = true;
+                    Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error configurando DeepSeek:\n\n{ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Guarda la configuración de Claude
+        /// </summary>
+        private async Task GuardarConfiguracionClaudeAsync()
+        {
+            try
+            {
+                // Verificar que Ollama esté disponible (Claude usa Ollama como backend)
+                var estadoOllama = await _factoryProveedorIA.ObtenerEstadoTodosProveedoresAsync();
+                
+                if (!estadoOllama.TryGetValue("ollama", out var estado) || !estado.EstaDisponible)
+                {
+                    MessageBox.Show("Claude requiere Ollama para funcionar.\n\n" +
+                        "• Verifica que Ollama esté instalado y funcionando\n" +
+                        "• Asegúrate de que el modelo Claude-style esté descargado\n" +
+                        "• Usa los botones de instalación si es necesario",
+                        "Ollama requerido", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Confirmación
+                var resultado = MessageBox.Show("¿Deseas activar Claude-Style Llama como proveedor de IA?\n\n" +
+                    "• 💬 Optimizado para conversaciones naturales\n" +
+                    "• 🎨 Excelente para escritura creativa y asistencia\n" +
+                    "• 🔒 Procesamiento 100% local y offline\n" +
+                    "• 🚀 Zero data leakage - datos nunca salen de tu PC\n" +
+                    "• ⚡ No requiere API Key ni conexión a internet",
+                    "Activar Claude-Style", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (resultado == MessageBoxResult.Yes)
+                {
+                    await CambiarProveedorActivoAsync("claude");
+                    ConfiguracionGuardada = true;
+                    DialogResult = true;
+                    Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error configurando Claude:\n\n{ex.Message}",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
