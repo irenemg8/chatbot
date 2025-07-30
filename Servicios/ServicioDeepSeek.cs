@@ -86,7 +86,7 @@ namespace ChatbotGomarco.Servicios
             }
         }
 
-        public async Task<string> GenerarRespuestaAsync(string mensaje, List<MensajeChat> historial = null)
+        public async Task<string> GenerarRespuestaAsync(string mensaje, List<MensajeChat>? historial = null)
         {
             try
             {
@@ -170,6 +170,37 @@ namespace ChatbotGomarco.Servicios
                     throw new InvalidOperationException("DeepSeek no está disponible");
                 }
 
+                // 🆕 DETECCIÓN AUTOMÁTICA DE FACTURAS  
+                var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(_ => { });
+                var analizadorFacturas = new AnalizadorFacturas(loggerFactory.CreateLogger<AnalizadorFacturas>());
+                
+                if (analizadorFacturas.EsFactura(contenidoArchivos))
+                {
+                    _logger.LogInformation("🧠📄 DeepSeek detectó FACTURA - Activando análisis especializado");
+                    
+                    // Usar análisis especializado de facturas
+                    var analisisFactura = await analizadorFacturas.AnalizarFacturaAsync(contenidoArchivos, pregunta);
+                    
+                    // Si el análisis automático fue exitoso, usar prompt optimizado
+                    if (analisisFactura.EsFacturaValida)
+                    {
+                        var promptEspecializado = analizadorFacturas.GenerarPromptAnalisisFactura(
+                            contenidoArchivos, pregunta, TipoProveedorIA.DeepSeek);
+                        
+                        var analisisIA = await _servicioOllama.AnalizarContenidoConIAAsync(contenidoArchivos, promptEspecializado);
+                        
+                        // Combinar análisis estructurado + análisis de IA
+                        return $@"{analisisFactura.AnalisisCompleto}
+
+---
+
+🧠 **ANÁLISIS AVANZADO DEEPSEEK-R1:**
+
+{analisisIA}";
+                    }
+                }
+
+                // Análisis genérico mejorado para otros tipos de documentos
                 var promptAnalisis = $@"[ANÁLISIS AVANZADO CON DEEPSEEK-R1]
 
 Analiza el siguiente contenido usando razonamiento paso a paso:

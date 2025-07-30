@@ -50,6 +50,7 @@ namespace ChatbotGomarco
             servicios.AddScoped<ServicioOllama>();
             servicios.AddScoped<ServicioDeepSeek>();
             servicios.AddScoped<ServicioClaude>();
+            servicios.AddScoped<IAnalizadorFacturas, AnalizadorFacturas>(); // 🆕 Sistema especializado de análisis de facturas
             servicios.AddSingleton<IFactoryProveedorIA, FactoryProveedorIA>();
 
             // Servicios LLM modulares

@@ -367,7 +367,59 @@ namespace ChatbotGomarco.Servicios
                         resultadoSeguridadPregunta.ContenidoAnonimizado);
                 }
 
-                // Usar las mismas instrucciones precisas que OpenAI para máxima calidad
+                // 🆕 DETECCIÓN AUTOMÁTICA DE FACTURAS
+                var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(_ => { });
+                var analizadorFacturas = new AnalizadorFacturas(loggerFactory.CreateLogger<AnalizadorFacturas>());
+                
+                if (analizadorFacturas.EsFactura(contenidoArchivos))
+                {
+                    _logger.LogInformation("⚡📄 Ollama detectó FACTURA - Activando análisis rápido especializado");
+                    
+                    // Usar análisis especializado de facturas
+                    var analisisFactura = await analizadorFacturas.AnalizarFacturaAsync(contenidoArchivos, pregunta);
+                    
+                    // Si el análisis automático fue exitoso, usar prompt optimizado
+                    if (analisisFactura.EsFacturaValida)
+                    {
+                        var promptEspecializado = analizadorFacturas.GenerarPromptAnalisisFactura(
+                            resultadoSeguridadContenido.ContenidoAnonimizado, resultadoSeguridadPregunta.ContenidoAnonimizado, TipoProveedorIA.Ollama);
+                        
+                        var solicitudFactura = new
+                        {
+                            model = _modeloActual,
+                            messages = new[] 
+                            {
+                                new { role = "user", content = promptEspecializado }
+                            },
+                            stream = false,
+                            options = new
+                            {
+                                temperature = 0.3, // Más determinista para facturas
+                                top_p = 0.9,
+                                max_tokens = 2048
+                            }
+                        };
+
+                        var responseFactura = await EnviarSolicitudAsync("/api/chat", solicitudFactura);
+                        
+                        if (responseFactura.TryGetProperty("message", out var messageElementFactura) &&
+                            messageElementFactura.TryGetProperty("content", out var contentElementFactura))
+                        {
+                            var analisisIA = contentElementFactura.GetString() ?? "Análisis no disponible";
+                            
+                            // Combinar análisis estructurado + análisis rápido de IA
+                            return $@"{analisisFactura.AnalisisCompleto}
+
+---
+
+⚡ **ANÁLISIS RÁPIDO OLLAMA:**
+
+{analisisIA}";
+                        }
+                    }
+                }
+
+                // Análisis genérico mejorado para otros documentos
                 var sistemaInstrucciones = @"Eres MARCO, el asistente conversacional de GOMARCO. Te comportas como ChatGPT: natural, inteligente y útil. NO eres un robot corporativo.
 
 🎯 **TU ESTILO:**

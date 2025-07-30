@@ -87,7 +87,7 @@ namespace ChatbotGomarco.Servicios
             }
         }
 
-        public async Task<string> GenerarRespuestaAsync(string mensaje, List<MensajeChat> historial = null)
+        public async Task<string> GenerarRespuestaAsync(string mensaje, List<MensajeChat>? historial = null)
         {
             try
             {
@@ -171,6 +171,37 @@ namespace ChatbotGomarco.Servicios
                     throw new InvalidOperationException("Claude no está disponible");
                 }
 
+                // 🆕 DETECCIÓN AUTOMÁTICA DE FACTURAS
+                var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(_ => { });
+                var analizadorFacturas = new AnalizadorFacturas(loggerFactory.CreateLogger<AnalizadorFacturas>());
+                
+                if (analizadorFacturas.EsFactura(contenidoArchivos))
+                {
+                    _logger.LogInformation("💬📄 Claude detectó FACTURA - Activando análisis especializado");
+                    
+                    // Usar análisis especializado de facturas
+                    var analisisFactura = await analizadorFacturas.AnalizarFacturaAsync(contenidoArchivos, pregunta);
+                    
+                    // Si el análisis automático fue exitoso, usar prompt optimizado
+                    if (analisisFactura.EsFacturaValida)
+                    {
+                        var promptEspecializado = analizadorFacturas.GenerarPromptAnalisisFactura(
+                            contenidoArchivos, pregunta, TipoProveedorIA.Claude);
+                        
+                        var analisisIA = await _servicioOllama.AnalizarContenidoConIAAsync(contenidoArchivos, promptEspecializado);
+                        
+                        // Combinar análisis estructurado + análisis conversacional
+                        return $@"{analisisFactura.AnalisisCompleto}
+
+---
+
+💬 **ANÁLISIS CONVERSACIONAL CLAUDE-STYLE:**
+
+{analisisIA}";
+                    }
+                }
+
+                // Análisis genérico conversacional para otros documentos
                 var promptAnalisis = $@"[ANÁLISIS CONVERSACIONAL CLAUDE-STYLE]
 
 Como Claude, analiza el siguiente contenido de manera natural y útil:

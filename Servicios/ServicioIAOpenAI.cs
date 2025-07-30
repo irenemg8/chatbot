@@ -467,8 +467,50 @@ RESPUESTA REQUERIDA: Analiza el contenido anterior y responde de forma detallada
                     throw new InvalidOperationException("OpenAI API no está configurada");
                 }
 
-                // Usar contenido anonimizado para envío seguro a OpenAI
+                // 🆕 DETECCIÓN AUTOMÁTICA DE FACTURAS
+                var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(_ => { });
+                var analizadorFacturas = new AnalizadorFacturas(loggerFactory.CreateLogger<AnalizadorFacturas>());
                 var contenidoSeguro = resultadoSeguridad.ContenidoAnonimizado;
+                
+                if (analizadorFacturas.EsFactura(contenidoArchivos))
+                {
+                    _logger.LogInformation("🌐📄 OpenAI detectó FACTURA - Activando análisis de máxima potencia");
+                    
+                    // Usar análisis especializado de facturas
+                    var analisisFactura = await analizadorFacturas.AnalizarFacturaAsync(contenidoArchivos, pregunta);
+                    
+                    // Si el análisis automático fue exitoso, usar prompt optimizado para OpenAI
+                    if (analisisFactura.EsFacturaValida)
+                    {
+                        var promptEspecializado = analizadorFacturas.GenerarPromptAnalisisFactura(
+                            contenidoSeguro, pregunta, TipoProveedorIA.OpenAI);
+                        
+                        var solicitudFactura = new OpenAIRequest
+                        {
+                            Model = MODELO_ANALISIS,
+                            Messages = new List<OpenAIMessage>
+                            {
+                                new OpenAIMessage("user", promptEspecializado)
+                            },
+                            MaxTokens = MAX_TOKENS,
+                            Temperature = 0.3m, // Más determinista para análisis de facturas
+                            TopP = 0.9m
+                        };
+
+                        var analisisIA = await EnviarSolicitudOpenAIAsync(solicitudFactura);
+                        
+                        // Combinar análisis estructurado + análisis de máxima potencia
+                        return $@"{analisisFactura.AnalisisCompleto}
+
+---
+
+🌐 **ANÁLISIS DE MÁXIMA POTENCIA CON OPENAI GPT-4:**
+
+{analisisIA}";
+                    }
+                }
+
+                // Análisis genérico mejorado para otros documentos
                 var mensajeSistema = @"Eres MARCO, el asistente conversacional de GOMARCO. Te comportas como ChatGPT: natural, inteligente y útil. NO eres un robot corporativo.
 
 🎯 **TU ESTILO:**
